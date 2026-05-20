@@ -6,3 +6,4 @@
 
 pub mod binary;
 pub mod local;
+pub mod npm;
