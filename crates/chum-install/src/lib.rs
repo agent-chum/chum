@@ -18,5 +18,5 @@ pub mod sources;
 
 pub use error::InstallError;
 pub use fetcher::{Fetcher, ReqwestFetcher};
-pub use install::{InstalledArtifact, SourceKind};
+pub use install::{install, InstallConfig, InstalledArtifact, SourceKind};
 pub use paths::chum_home;
