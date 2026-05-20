@@ -8,6 +8,10 @@
 //! manifests: new variants and fields land behind a `schema_version` bump,
 //! and older parsers reject newer manifests cleanly.
 
+mod parse;
+
+pub use parse::parse_str;
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

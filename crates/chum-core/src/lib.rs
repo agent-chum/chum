@@ -17,4 +17,4 @@ pub mod error;
 pub mod manifest;
 
 pub use error::ManifestError;
-pub use manifest::Manifest;
+pub use manifest::{Manifest, parse_str};
