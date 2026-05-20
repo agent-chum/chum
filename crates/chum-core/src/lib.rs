@@ -1,15 +1,20 @@
 //! `chum-core` — shared types, manifest parsing, and signing primitives.
 //!
 //! Per the CHUM architecture invariants (see `CLAUDE.md`), this crate
-//! performs **no I/O**. It holds pure types, schemas, and serialization
+//! performs **no I/O**. It holds pure types, schemas, and serialisation
 //! logic only. Anything that touches the filesystem, network, processes,
 //! or launchd belongs in a different crate.
+//!
+//! The v0.1 surface is the manifest schema:
+//! [`manifest::parse_str`] reads a manifest TOML string,
+//! [`manifest::validate`] performs semantic checks beyond serde,
+//! and [`manifest::parse_and_validate`] composes the two.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-/// Placeholder export so the crate compiles before real types land.
-///
-/// Will be removed in the first feature commit that introduces an actual
-/// manifest type.
-pub fn placeholder() {}
+pub mod error;
+pub mod manifest;
+
+pub use error::ManifestError;
+pub use manifest::Manifest;
