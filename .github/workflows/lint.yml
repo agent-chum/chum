@@ -1,0 +1,14 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  placeholder:
+    name: lint-placeholder
+    runs-on: macos-latest
+    steps:
+      - name: Stub
+        run: echo "Lint stub. Real cargo fmt --check + clippy -D warnings gates land before v0.1."

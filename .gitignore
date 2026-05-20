@@ -1,0 +1,23 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Internal scope doc — not for the public repo (see §12 of the scope itself).
+CHUM_SCOPE.md
+
+# Per-machine Claude Code / agent state
+.claude/

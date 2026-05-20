@@ -1,0 +1,13 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  placeholder:
+    name: release-placeholder
+    runs-on: macos-latest
+    steps:
+      - name: Stub
+        run: echo "Release stub. Real packaging (Homebrew tap + GitHub release binaries) lands with v0.1."

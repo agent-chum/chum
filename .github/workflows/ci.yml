@@ -1,0 +1,14 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  placeholder:
+    name: ci-placeholder
+    runs-on: macos-latest
+    steps:
+      - name: Stub
+        run: echo "CI stub. Real cargo build/test pipeline lands with the first feature commit."
