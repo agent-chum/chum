@@ -1,0 +1,22 @@
+[package]
+name = "chum-install"
+description = "Install-time I/O for CHUM manifests — npm / local / binary source handling, fetch, checksum, extract."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+chum-core.workspace = true
+flate2.workspace = true
+reqwest.workspace = true
+sha2.workspace = true
+tar.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
