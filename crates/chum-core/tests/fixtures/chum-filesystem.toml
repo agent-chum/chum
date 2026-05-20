@@ -1,0 +1,40 @@
+schema_version = "0.1"
+
+[package]
+name = "filesystem"
+version = "0.1.0"
+description = "Anthropic's official MCP server exposing filesystem read/write."
+license = "MIT"
+authors = ["Anthropic"]
+tags = ["official", "files"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-filesystem"
+version = "^0.1"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "${HOME}/Documents"]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = ["read_file", "write_file", "list_directory", "create_directory", "move_file", "search_files"]
+resources = []
+prompts = []
+
+# Forward-compat: v0.2 enforces these grants, v0.1 chum-core accepts the
+# content as an opaque toml::Table and round-trips it without interpreting.
+[permissions]
+allowed_paths = ["${HOME}/Documents", "${HOME}/Desktop"]
+denied_paths = ["${HOME}/.ssh", "${HOME}/.aws"]

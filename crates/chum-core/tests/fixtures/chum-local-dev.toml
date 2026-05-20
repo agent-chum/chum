@@ -1,0 +1,32 @@
+schema_version = "0.1"
+
+[package]
+name = "local-dev"
+version = "0.0.1"
+description = "Local development manifest pointing at a working tree."
+license = "MIT"
+authors = ["Karoshi"]
+tags = ["dev"]
+
+[source]
+kind = "local"
+path = "/Users/karoshi/code/mcp-experiment"
+
+[runtime]
+command = "/Users/karoshi/code/mcp-experiment/target/debug/mcp-experiment"
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "never"
+startup_timeout_sec = 5
+shutdown_grace_sec = 2
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = ["echo", "ping"]
+resources = []
+prompts = []

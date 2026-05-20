@@ -1,0 +1,44 @@
+schema_version = "0.1"
+
+[package]
+name = "postgres-remote"
+version = "0.3.0"
+description = "Postgres MCP server bound to a localhost HTTP port."
+license = "Apache-2.0"
+authors = ["CHUM contributors"]
+tags = ["data", "postgres", "http"]
+
+[source]
+kind = "npm"
+package = "@example/mcp-postgres"
+version = "^0.3"
+
+[runtime]
+command = "npx"
+args = ["-y", "@example/mcp-postgres"]
+
+[runtime.transport]
+kind = "http"
+port = 8080
+bind = "127.0.0.1"
+path = "/mcp"
+
+[runtime.env]
+DATABASE_URL = "${POSTGRES_URL}"
+
+[lifecycle]
+restart = "always"
+startup_timeout_sec = 30
+shutdown_grace_sec = 10
+
+[health]
+kind = "http"
+url = "http://127.0.0.1:8080/health"
+expect_status = 200
+interval_sec = 30
+timeout_sec = 5
+
+[capabilities]
+tools = ["pg_query", "pg_exec", "pg_describe"]
+resources = ["schema:*", "table:*"]
+prompts = []

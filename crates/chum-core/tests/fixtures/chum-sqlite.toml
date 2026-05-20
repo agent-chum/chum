@@ -1,0 +1,35 @@
+schema_version = "0.1"
+
+[package]
+name = "sqlite"
+version = "0.2.0"
+description = "Embedded SQLite MCP server, distributed as a signed binary."
+license = "MIT"
+authors = ["CHUM contributors"]
+tags = ["data", "sqlite"]
+
+[source]
+kind = "binary"
+url = "https://github.com/example/mcp-sqlite/releases/download/v0.2.0/mcp-sqlite-aarch64-apple-darwin.tar.gz"
+checksum_sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+target_triple = "aarch64-apple-darwin"
+
+[runtime]
+command = "mcp-sqlite"
+args = ["--db", "${HOME}/.local/share/chum/sqlite.db"]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 8
+shutdown_grace_sec = 3
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = ["sql_query", "sql_exec"]
+resources = ["table:*"]
+prompts = []

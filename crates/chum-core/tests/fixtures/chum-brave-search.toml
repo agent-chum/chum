@@ -1,0 +1,37 @@
+schema_version = "0.1"
+
+[package]
+name = "brave-search"
+version = "0.1.2"
+description = "MCP server exposing Brave Search API queries."
+license = "MIT"
+authors = ["Anthropic"]
+tags = ["official", "search", "web"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-brave-search"
+version = "^0.1"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-brave-search"]
+
+[runtime.transport]
+kind = "stdio"
+
+[runtime.env]
+BRAVE_API_KEY = "${BRAVE_API_KEY}"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 15
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = ["brave_web_search", "brave_local_search"]
+resources = []
+prompts = []
