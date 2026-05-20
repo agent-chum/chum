@@ -11,7 +11,9 @@
 #![warn(missing_docs)]
 
 pub mod error;
+pub mod fetcher;
 pub mod paths;
 
 pub use error::InstallError;
+pub use fetcher::{Fetcher, ReqwestFetcher};
 pub use paths::chum_home;

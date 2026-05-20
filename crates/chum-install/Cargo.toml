@@ -8,6 +8,13 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+# Exposes `chum_install::fetcher::test_support::MockFetcher` and any other
+# test-only helpers. Off by default; downstream consumers (and this crate's
+# own integration tests, via [[test]] required-features) opt in explicitly
+# so production code cannot accidentally depend on test scaffolding.
+test-support = []
+
 [dependencies]
 chum-core.workspace = true
 flate2.workspace = true
@@ -20,3 +27,7 @@ zip.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# Note: `[[test]] name = "install" required-features = ["test-support"]`
+# lands alongside `tests/install.rs` in a later commit. Until then, no
+# integration tests exist for cargo to discover.
