@@ -1,0 +1,20 @@
+schema_version = "0.1"
+
+[package]
+name = "BadName!"
+version = "0.1.0"
+description = "Package name contains uppercase letters and punctuation."
+license = "MIT"
+authors = ["test"]
+
+[source]
+kind = "npm"
+package = "@example/bad-name"
+version = "^0.1"
+
+[runtime]
+command = "echo"
+args = ["hello"]
+
+[runtime.transport]
+kind = "stdio"

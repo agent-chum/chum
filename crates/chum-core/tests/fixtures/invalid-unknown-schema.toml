@@ -1,0 +1,11 @@
+# A hypothetical future manifest. v0.1 chum-core refuses it via
+# ManifestError::UnsupportedSchemaVersion before attempting to interpret
+# any of the later fields.
+schema_version = "9.9"
+
+[package]
+name = "future-thing"
+version = "0.0.0"
+description = "A manifest from a future chum version."
+license = "MIT"
+authors = ["future"]

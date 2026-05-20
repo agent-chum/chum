@@ -1,0 +1,19 @@
+schema_version = "0.1"
+
+[package]
+name = "broken-binary"
+version = "0.1.0"
+description = "Binary source without checksum_sha256 — required field missing."
+license = "MIT"
+authors = ["test"]
+
+[source]
+kind = "binary"
+url = "https://example.com/binary.tar.gz"
+# Intentionally missing: checksum_sha256
+
+[runtime]
+command = "broken"
+
+[runtime.transport]
+kind = "stdio"
