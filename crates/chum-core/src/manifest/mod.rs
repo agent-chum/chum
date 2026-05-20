@@ -9,8 +9,10 @@
 //! and older parsers reject newer manifests cleanly.
 
 mod parse;
+mod validate;
 
-pub use parse::parse_str;
+pub use parse::{parse_and_validate, parse_str};
+pub use validate::validate;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

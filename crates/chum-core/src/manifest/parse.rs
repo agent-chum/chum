@@ -58,3 +58,19 @@ pub fn parse_str(input: &str) -> Result<Manifest, ManifestError> {
     let manifest: Manifest = toml::from_str(input)?;
     Ok(manifest)
 }
+
+/// Parse a manifest from a TOML string **and** run semantic validation.
+///
+/// Convenience equivalent to [`parse_str`] followed by [`super::validate`].
+/// Use this when you want a single call to surface either a parse error
+/// or a semantic violation.
+///
+/// # Errors
+///
+/// Any [`ManifestError`] variant that [`parse_str`] or
+/// [`super::validate`] can produce.
+pub fn parse_and_validate(input: &str) -> Result<Manifest, ManifestError> {
+    let manifest = parse_str(input)?;
+    super::validate(&manifest)?;
+    Ok(manifest)
+}
