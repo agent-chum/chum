@@ -59,6 +59,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "chum-broker"
+version = "0.0.1"
+
+[[package]]
 name = "chum-cli"
 version = "0.0.1"
 dependencies = [
@@ -72,6 +76,14 @@ version = "0.0.1"
 dependencies = [
  "thiserror",
 ]
+
+[[package]]
+name = "chum-daemon"
+version = "0.0.1"
+
+[[package]]
+name = "chum-registry"
+version = "0.0.1"
 
 [[package]]
 name = "clap"
