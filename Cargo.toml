@@ -5,7 +5,13 @@
 # anchors the shared types the other crates will pull from.
 
 [workspace]
-members = ["crates/chum-core", "crates/chum-cli"]
+members = [
+    "crates/chum-core",
+    "crates/chum-cli",
+    "crates/chum-daemon",
+    "crates/chum-broker",
+    "crates/chum-registry",
+]
 resolver = "3"
 
 [workspace.package]

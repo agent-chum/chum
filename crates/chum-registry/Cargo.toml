@@ -1,0 +1,9 @@
+[package]
+name = "chum-registry"
+description = "CHUM local manifest store. Read-write SQLite. Caches installed manifests, version pins, dependency graph."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
