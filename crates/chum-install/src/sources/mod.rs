@@ -4,4 +4,5 @@
 //! variant. The top-level [`crate::install::install`] function (in a
 //! later commit) dispatches into these by pattern matching.
 
+pub mod binary;
 pub mod local;
