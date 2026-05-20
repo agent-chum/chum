@@ -117,8 +117,19 @@ target_triple = "aarch64-apple-darwin"   # optional
 | Field | Type | Required | Validation |
 |---|---|---|---|
 | `url` | string | yes | Must start with `http://` or `https://`. |
-| `checksum_sha256` | string | yes | Exactly 64 hex characters. |
+| `checksum_sha256` | string | yes | Exactly 64 hex characters (either case accepted). |
 | `target_triple` | string | no | Reserved for multi-platform releases. |
+
+**Archive detection (v0.1, install layer).** [`chum-install`](../crates/chum-install/) decides whether to extract or place verbatim by looking at the URL suffix only. Query strings (`?token=…`) are stripped before matching.
+
+| URL suffix | Treatment |
+|---|---|
+| `.tar.gz` / `.tgz` | tar + gzip extraction into `<install_dir>/bin/` |
+| `.tar` | tar extraction into `<install_dir>/bin/` |
+| `.zip` | zip extraction into `<install_dir>/bin/` |
+| any other suffix | placed verbatim at `<install_dir>/bin/<basename>` |
+
+v0.1 does **not** inspect `Content-Type` headers or magic bytes. Manifest authors must use a known extension to trigger extraction; an unknown extension yields a single-file install.
 
 The `Registry` source kind lands in v0.5 behind a `schema_version` bump.
 
