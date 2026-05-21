@@ -183,6 +183,19 @@ pub enum UserFacingError {
         /// Permission value.
         value: String,
     },
+    /// `chum env set` / `unset` saw a key that doesn't match
+    /// `[A-Za-z_][A-Za-z0-9_]*`.
+    EnvKeyInvalid {
+        /// Literal key string the user passed.
+        key: String,
+    },
+    /// Writing the updated manifest TOML back to disk failed.
+    EnvUpdateFailed {
+        /// Path we tried to write.
+        path: PathBuf,
+        /// Free-form reason (serialisation or I/O).
+        reason: String,
+    },
 }
 
 impl UserFacingError {
@@ -254,6 +267,8 @@ impl UserFacingError {
             UserFacingError::PermissionDenied { .. } => "permission_denied",
             UserFacingError::UnknownPermission { .. } => "unknown_permission",
             UserFacingError::GrantNotFound { .. } => "grant_not_found",
+            UserFacingError::EnvKeyInvalid { .. } => "env_key_invalid",
+            UserFacingError::EnvUpdateFailed { .. } => "env_update_failed",
         }
     }
 
@@ -423,6 +438,12 @@ impl UserFacingError {
             }
             UserFacingError::GrantNotFound { name, version, kind, value } => {
                 format!("no grant '{kind}={value}' on '{name}' {version}")
+            }
+            UserFacingError::EnvKeyInvalid { key } => {
+                format!("env key '{key}' is invalid")
+            }
+            UserFacingError::EnvUpdateFailed { path, reason } => {
+                format!("failed to update {}: {reason}", path.display())
             }
         }
     }

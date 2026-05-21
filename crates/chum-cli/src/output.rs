@@ -234,6 +234,88 @@ pub fn emit_restarted(
     }
 }
 
+/// `chum env list` output. Keys only — values are never shown,
+/// even in JSON mode (the manifest's `runtime.env` may carry
+/// secrets).
+pub fn emit_env_list(
+    name: &str,
+    version: &str,
+    entries: &[(String, bool)],
+    json: bool,
+) {
+    if json {
+        let entries_json: Vec<serde_json::Value> = entries
+            .iter()
+            .map(|(k, set)| {
+                serde_json::json!({"key": k, "status": if *set { "set" } else { "unset" }})
+            })
+            .collect();
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "env": {
+                "name": name,
+                "version": version,
+                "entries": entries_json,
+            }
+        });
+        println!("{envelope}");
+        return;
+    }
+    println!("chum env for {name} {version}");
+    println!();
+    if entries.is_empty() {
+        println!("  (no env keys declared or set)");
+        return;
+    }
+    let key_width = entries
+        .iter()
+        .map(|(k, _)| k.len())
+        .max()
+        .unwrap_or(0)
+        .max("KEY".len());
+    println!("  {:kw$}  STATUS", "KEY", kw = key_width);
+    for (key, set) in entries {
+        let status = if *set { "set" } else { "unset" };
+        println!("  {:kw$}  {}", key, status, kw = key_width);
+    }
+}
+
+/// `chum env set` confirmation. The value is never echoed.
+pub fn emit_env_set(name: &str, version: &str, key: &str, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "env_set": {"name": name, "version": version, "key": key}
+        });
+        println!("{envelope}");
+    } else {
+        println!("Set {key} in {name} {version} (value not echoed)");
+        println!("Run 'chum restart {name}' for the change to take effect.");
+    }
+}
+
+/// `chum env unset` confirmation. `was_set = false` is idempotent
+/// success.
+pub fn emit_env_unset(name: &str, version: &str, key: &str, was_set: bool, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "env_unset": {
+                "name": name,
+                "version": version,
+                "key": key,
+                "was_set": was_set,
+            }
+        });
+        println!("{envelope}");
+    } else if was_set {
+        println!("Unset {key} in {name} {version}");
+        println!("Run 'chum restart {name}' for the change to take effect.");
+    } else {
+        println!("{key} was not set in {name} {version} (no-op)");
+    }
+}
+
 /// `chum permit` confirmation listing every grant that landed.
 pub fn emit_granted(
     name: &str,

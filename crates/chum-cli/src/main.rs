@@ -54,6 +54,11 @@ enum Command {
     Revoke(commands::revoke::RevokeArgs),
     /// Show declared vs granted vs missing permissions.
     Permissions(commands::permissions::PermissionsArgs),
+    /// Manage a package's env vars (set/unset/list).
+    Env {
+        #[command(subcommand)]
+        sub: commands::env::EnvSub,
+    },
     /// Diagnostic + control operations against the chumd daemon itself.
     Daemon {
         #[command(subcommand)]
@@ -108,6 +113,14 @@ async fn main() {
         Command::Permissions(args) => {
             let json = args.json;
             (commands::permissions::run(args).await, json)
+        }
+        Command::Env { sub } => {
+            let json = match &sub {
+                commands::env::EnvSub::List(a) => a.json,
+                commands::env::EnvSub::Set { common, .. } => common.json,
+                commands::env::EnvSub::Unset { common, .. } => common.json,
+            };
+            (commands::env::run(sub).await, json)
         }
         Command::Daemon { sub } => {
             let json = match &sub {
