@@ -367,6 +367,86 @@ LaunchAgents run only when the user is logged in (FileVault volumes mount on log
 
 `chum daemon service-status` runs `launchctl list cloud.chum.daemon` and line-parses the OpenStep-format output for `"PID"` and `"LastExitStatus"`. No `plist` crate dependency — the output isn't XML, it's NeXTSTEP-style, and a 20-line line scanner handles the two fields the cli surfaces. Implementation in `commands/daemon_service.rs::parse_int_field`.
 
+## chum-broker (v0.1 bookkeeping)
+
+`chum-broker` is the capability-verification primitive that gates `Supervisor::spawn`. v0.1 is **bookkeeping only**: the manifest declares what permissions the MCP server needs, the user grants them via `chum permit`, the daemon refuses to spawn if any required permission is ungranted. **No actual sandboxing in v0.1.** v0.2 adds sandbox-exec profile generation + env scrubbing + network filtering using the same data — see [`docs/BROKER_DESIGN.md`](BROKER_DESIGN.md) for the full design.
+
+### Permission categories (v0.1)
+
+Five wire codes, locked at v0.1:
+
+| Code | Value shape | Example |
+|---|---|---|
+| `filesystem.read` | absolute path | `/Users/x/Documents` |
+| `filesystem.write` | absolute path | `/tmp/chum-workspace` |
+| `network.outbound` | host (no scheme, no port) | `api.search.brave.com` |
+| `env.read` | env var name | `BRAVE_API_KEY` |
+| `subprocess.exec` | program name or absolute path | `git`, `/usr/bin/curl` |
+
+**Granularity: exact-string match.** A grant for `/Users/x` does NOT cover `/Users/x/Documents`; a grant for `anthropic.com` does NOT cover `api.anthropic.com`. v0.2's enforcement layer adds wildcard / prefix matching when usability needs it.
+
+### Pipeline
+
+```
+chum start <name>
+        │
+        ▼
+verb_spawn (chum-daemon)
+   │
+   │  1. registry.get_by_name_version  ──► InstalledArtifact { id, ... }
+   │  2. fs::read_to_string(install_dir/chum-manifest.toml)
+   │  3. chum_core::parse_and_validate ──► Manifest { permissions, ... }
+   │  4. registry.list_grants(artifact.id) ──► Vec<Grant>
+   │  5. chum_broker::validate(&manifest.permissions, &grants)
+   │           │
+   │           ▼ Allow                          ▼ Deny { unmet }
+   ▼           │                                 │
+6. Supervisor::spawn                Response::error("permission_denied",
+                                       "<name> <version> requires grants
+                                       not yet given: <list>. Run: chum
+                                       permit <name> --grant <kind>=<value>")
+```
+
+### Registry storage
+
+Migration 2 adds the `permission_grants` table:
+
+```sql
+CREATE TABLE permission_grants (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    artifact_id INTEGER NOT NULL,
+    kind        TEXT NOT NULL CHECK (kind IN (
+                    'filesystem.read', 'filesystem.write',
+                    'network.outbound', 'env.read', 'subprocess.exec'
+                )),
+    value       TEXT NOT NULL,
+    granted_at  TEXT NOT NULL,
+    UNIQUE(artifact_id, kind, value),
+    FOREIGN KEY (artifact_id) REFERENCES installed_artifacts(id) ON DELETE CASCADE
+);
+```
+
+The CHECK constraint pins the five v0.1 wire codes; adding a new category requires a new migration. The `ON DELETE CASCADE` means `chum uninstall` auto-removes the package's grants — no orphan rows.
+
+### CLI surface
+
+| Command | Effect | Wire codes on error |
+|---|---|---|
+| `chum permit <name> --grant <kind>=<value> [...]` | Add one or more grants. Idempotent — repeating is a no-op. | `unknown_permission` (parse) |
+| `chum revoke <name> --grant <kind>=<value>` | Remove one grant. | `grant_not_found` |
+| `chum permissions <name>` | Three-section diff: declared / granted / missing. | — |
+| `chum start <name>` (existing) | Now subject to broker check; `permission_denied` if any declared permission is ungranted. | `permission_denied` |
+
+`chum install` prints a hint listing the exact `chum permit` calls a user needs after install when the manifest declares any permissions. Skipped in `--json` mode (callers can read the manifest directly).
+
+### v0.1 invariants and explicit deferrals
+
+- **Pre-broker manifests still work.** Manifests without a `[permissions]` block parse to `Permissions::default()` (empty), broker auto-allows. No migration of existing installs needed.
+- **Extra grants beyond declared are silently allowed.** The broker validates "are required permissions covered?", not "are grants minimal?" `TODO(chum-v0.2)` marker in `chum-broker/src/lib.rs::validate` flags the strict-grants follow-up.
+- **No path canonicalisation on grants.** `~/Documents` is stored literally and won't match `/Users/x/Documents`. Helpful errors > silent expansion in v0.1.
+- **Puppeteer is the documented gap.** Its real requirements (broad network access, Chromium subprocess) need wildcard / prefix matching. `chum-puppeteer.toml` ships with empty `[permissions]` and an inline comment pointing at v0.2.
+- **v0.2 seam:** `chum_broker::sandbox_profile(&Permissions, &[Grant]) -> SandboxProfile` is the planned next function — generates a `sandbox-exec` `.sb` file body from the granted permissions. The daemon's `spawn_child` will wrap `Command::new(cmd)` with `sandbox-exec -p <profile>`. v0.1 surface stays unchanged when v0.2 lands.
+
 ## Invariants
 
 These are enforced as coding rules in [`CLAUDE.md`](../CLAUDE.md) and reviewed at every PR:

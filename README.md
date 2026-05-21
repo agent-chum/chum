@@ -173,6 +173,39 @@ cargo run --bin chum -- daemon uninstall-service
 
 Logs from the LaunchAgent itself go to `~/Library/Logs/chum-daemon.{stdout,stderr}.log`. Per-package logs (the ones `chum logs` reads) still live under `<install_dir>/logs/` as before.
 
+### Granting permissions (broker — v0.1 bookkeeping)
+
+Manifests declare what capabilities they need (filesystem paths, network hosts, env vars, subprocess execution). The daemon refuses to spawn until you've granted every declared permission. **v0.1 is bookkeeping, not enforcement** — spawned processes are not actually sandboxed yet; that lands in v0.2 with `sandbox-exec` profiles + env scrubbing. v0.1's job is to record every grant as a deliberate user action.
+
+After `chum install`, the cli prints the exact `chum permit` calls you'll need:
+
+```sh
+cargo run --bin chum -- install manifests/chum-brave-search.toml --root /tmp/chum-demo
+#  → Installed brave-search 0.1.0 at ...
+#  →
+#  → This manifest declares permissions you'll need to grant before 'chum start':
+#  →     chum permit brave-search --grant network.outbound=api.search.brave.com
+#  →     chum permit brave-search --grant env.read=BRAVE_API_KEY
+
+# Grant them. Multiple --grant flags can be passed in one invocation.
+cargo run --bin chum -- permit brave-search \
+    --grant network.outbound=api.search.brave.com \
+    --grant env.read=BRAVE_API_KEY \
+    --root /tmp/chum-demo
+
+# Inspect the declared / granted / missing diff at any time:
+cargo run --bin chum -- permissions brave-search --root /tmp/chum-demo
+
+# Revoke a single grant (one per invocation in v0.1):
+cargo run --bin chum -- revoke brave-search \
+    --grant env.read=BRAVE_API_KEY \
+    --root /tmp/chum-demo
+```
+
+`chum start` against an unpermitted package fails with `permission_denied` and prints the exact `chum permit ...` lines the user is missing. Exact-string matching only in v0.1 — wildcards (`*.anthropic.com`) and prefix matching (`/Users/x` covering `/Users/x/Documents`) land in v0.2.
+
+Five permission kinds, locked at v0.1: `filesystem.read`, `filesystem.write`, `network.outbound`, `env.read`, `subprocess.exec`. Every grant string is `<kind>=<value>`. The full design lives in [`docs/BROKER_DESIGN.md`](docs/BROKER_DESIGN.md).
+
 ## Status
 
 `v0.0.1` — repository scaffold only. v0.1 (CLI + daemon + 10–15 first-party manifests) is targeted for 90 days out. See [`ROADMAP.md`](ROADMAP.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

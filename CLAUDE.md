@@ -35,7 +35,7 @@ These are enforced at review time. Violation is a blocker.
 - **`chum-core` has no I/O.** Pure types, schemas, and parsing only. No filesystem, network, process, or launchd touches.
 - **`chum-cli` is a thin layer over the chum-daemon protocol once chum-daemon exists.** It never bypasses the daemon to talk to MCP servers or the manifest store directly. **v0.1 stopgap:** until the daemon protocol lands, `chum-cli` composes `chum-install` + `chum-registry` directly inside `commands/install.rs`; that composition moves behind the daemon when it ships. Do not add new direct-bypass paths beyond what is already there.
 - **`chum-daemon` owns process supervision and state.** All `start` / `stop` / `restart` paths flow through it.
-- **`chum-broker` gates all agent ↔ MCP server access.** No direct passthrough; every capability use is mediated.
+- **`chum-broker` gates all agent ↔ MCP server access.** No direct passthrough; every capability use is mediated. **v0.1 is bookkeeping only** — the broker validates that manifest-declared permissions are granted at spawn time, but spawned processes are not actually sandboxed yet. Real enforcement (sandbox-exec profiles + env scrubbing + network filtering) lands in v0.2 against the same `Permissions` + `Grant` data model. See `docs/BROKER_DESIGN.md`.
 - **`chum-registry` is read-write SQLite.** It never mixes concerns with `chum-broker`.
 
 ## Commits
