@@ -68,6 +68,14 @@ pub enum InstallError {
     #[error("path traversal rejected: `{0}`")]
     PathTraversal(PathBuf),
 
+    /// Serialising the manifest back into TOML for
+    /// `<install_dir>/chum-manifest.toml` failed. The on-disk install
+    /// is already complete by this point — this error indicates a bug
+    /// in the manifest types or an exotic value that the `toml` crate
+    /// cannot round-trip.
+    #[error("failed to serialise manifest to TOML for install_dir: {0}")]
+    ManifestSerialize(#[source] toml::ser::Error),
+
     /// Underlying I/O error from std / tokio.
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),

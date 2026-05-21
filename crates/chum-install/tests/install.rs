@@ -316,3 +316,44 @@ async fn install_missing_tool_surfaces_specific_error() {
         other => panic!("expected MissingTool, got {other:?}"),
     }
 }
+
+#[tokio::test]
+async fn install_writes_chum_manifest_and_logs_dir() {
+    // The daemon depends on `<install_dir>/chum-manifest.toml` being
+    // present after install so it can re-parse on spawn. The
+    // `logs/` directory is where supervisor redirects child
+    // stdout/stderr. Both must exist after a successful install of
+    // any source kind — this test covers Source::Local; the other
+    // source-specific tests above implicitly cover them too because
+    // the post-install step runs in the dispatcher.
+    let root = TempDir::new().expect("tempdir");
+    let source = TempDir::new().expect("source tempdir");
+    tokio::fs::write(source.path().join("SENTINEL"), "x")
+        .await
+        .expect("seed source");
+
+    let manifest = local_manifest(&source.path().display().to_string());
+    let fetcher = MockFetcher::new();
+    let config = InstallConfig::default();
+    let artifact = install(&manifest, root.path(), &fetcher, &config)
+        .await
+        .expect("install should succeed");
+
+    let manifest_path = artifact.install_dir.join("chum-manifest.toml");
+    assert!(
+        manifest_path.is_file(),
+        "chum-manifest.toml must exist at {manifest_path:?}"
+    );
+    let logs_dir = artifact.install_dir.join("logs");
+    assert!(logs_dir.is_dir(), "logs dir must exist at {logs_dir:?}");
+
+    // The on-disk manifest should round-trip back into the same
+    // Manifest value chum-core parses.
+    let on_disk = tokio::fs::read_to_string(&manifest_path)
+        .await
+        .expect("read manifest");
+    let reparsed = chum_core::parse_and_validate(&on_disk)
+        .expect("on-disk manifest re-parses cleanly");
+    assert_eq!(reparsed.package.name, manifest.package.name);
+    assert_eq!(reparsed.package.version, manifest.package.version);
+}

@@ -118,7 +118,7 @@ pub async fn install<F: Fetcher>(
     );
     tokio::fs::create_dir_all(&install_dir).await?;
 
-    match &manifest.source {
+    let artifact = match &manifest.source {
         Source::Npm { package, version } => {
             crate::sources::npm::install_npm(
                 manifest,
@@ -148,5 +148,35 @@ pub async fn install<F: Fetcher>(
         }
         Source::Pypi { .. } => Err(InstallError::UnsupportedSource("pypi".to_string())),
         Source::Github { .. } => Err(InstallError::UnsupportedSource("github".to_string())),
-    }
+    }?;
+
+    // Post-install: write the manifest into the install dir + create
+    // logs/. The daemon re-parses chum-manifest.toml on every spawn,
+    // and per-package log files land in logs/{stdout,stderr}.log.
+    write_post_install_artifacts(manifest, &artifact.install_dir).await?;
+
+    Ok(artifact)
+}
+
+/// Serialize the manifest into `<install_dir>/chum-manifest.toml` and
+/// create the empty `<install_dir>/logs/` directory.
+///
+/// This is the canonical post-install side-effect that
+/// `chum-daemon` depends on: every spawn re-reads
+/// `chum-manifest.toml` so the daemon sees exactly what the user
+/// installed, and child stdout/stderr land in
+/// `logs/{stdout,stderr}.log`.
+///
+/// Simple write (not atomic temp-file + rename) because
+/// `install_dir` is private to a single install — no concurrent
+/// writer to race against.
+async fn write_post_install_artifacts(
+    manifest: &Manifest,
+    install_dir: &Path,
+) -> Result<(), InstallError> {
+    let manifest_toml = toml::to_string(manifest)
+        .map_err(InstallError::ManifestSerialize)?;
+    tokio::fs::write(install_dir.join("chum-manifest.toml"), manifest_toml).await?;
+    tokio::fs::create_dir_all(install_dir.join("logs")).await?;
+    Ok(())
 }

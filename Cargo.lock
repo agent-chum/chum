@@ -229,6 +229,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "toml",
  "zip",
 ]
 

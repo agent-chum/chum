@@ -138,6 +138,9 @@ impl UserFacingError {
             }
             UserFacingError::Install(InstallError::PathTraversal(_)) => "install_path_traversal",
             UserFacingError::Install(InstallError::Io(_)) => "install_io",
+            UserFacingError::Install(InstallError::ManifestSerialize(_)) => {
+                "install_manifest_serialize"
+            }
             UserFacingError::Registry(RegistryError::SqlError(_)) => "registry_sql",
             UserFacingError::Registry(RegistryError::MigrationFailed { .. }) => {
                 "registry_migration"
@@ -221,6 +224,9 @@ impl UserFacingError {
             }
             UserFacingError::Install(InstallError::Io(e)) => {
                 format!("i/o error during install: {e}")
+            }
+            UserFacingError::Install(InstallError::ManifestSerialize(e)) => {
+                format!("could not serialize manifest into install_dir: {e}")
             }
             UserFacingError::Registry(RegistryError::SqlError(e)) => {
                 format!("registry sqlite error: {e}")
