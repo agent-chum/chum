@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::Utc;
-use chum_daemon::{IpcError, Supervisor};
+use chum_daemon::IpcError;
 use chum_daemon::ipc::server::{DaemonState, serve};
 use clap::Parser;
 use thiserror::Error;
@@ -88,11 +88,11 @@ async fn main() -> Result<(), ChumdError> {
 
     let installed_count = read_installed_count(&root)?;
 
-    let state = Arc::new(DaemonState {
-        started_at: Utc::now(),
+    let state = Arc::new(DaemonState::new(
+        Utc::now(),
+        root.clone(),
         installed_count,
-        supervisor: Supervisor::new(),
-    });
+    ));
 
     log(&format!(
         "chumd ready (socket={}, installed_count={installed_count})",

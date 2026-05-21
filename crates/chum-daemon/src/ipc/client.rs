@@ -14,7 +14,9 @@ use tokio::net::UnixStream;
 
 use crate::error::IpcError;
 use crate::ipc::{
-    ListProcessesResponse, PROTOCOL_VERSION, PingResponse, Request, Response, StatusResponse,
+    ListProcessesResponse, PROTOCOL_VERSION, PingResponse, ProcessKeyArgs, ProcessStatusResponse,
+    Request, Response, RestartProcessResponse, SpawnResponse, StatusResponse, TerminateArgs,
+    TerminateResponse,
 };
 
 /// One-request-per-connection client for the daemon's IPC socket.
@@ -99,6 +101,84 @@ impl DaemonClient {
             protocol_version: PROTOCOL_VERSION,
             verb: "list_processes".to_string(),
             args: serde_json::Value::Null,
+        };
+        self.decode_ok(self.request(&req).await?)
+    }
+
+    /// Send a `spawn` verb and decode the typed payload. The daemon
+    /// looks up the install_dir in the registry and re-parses
+    /// `<install_dir>/chum-manifest.toml` before handing the
+    /// resulting Manifest to `Supervisor::spawn`.
+    pub async fn spawn_process(
+        &self,
+        name: impl Into<String>,
+        version: impl Into<String>,
+    ) -> Result<SpawnResponse, IpcError> {
+        let args = ProcessKeyArgs {
+            name: name.into(),
+            version: version.into(),
+        };
+        let req = Request {
+            protocol_version: PROTOCOL_VERSION,
+            verb: "spawn".to_string(),
+            args: serde_json::to_value(args)?,
+        };
+        self.decode_ok(self.request(&req).await?)
+    }
+
+    /// Send a `terminate` verb with an optional grace duration.
+    /// Defaults the grace to 5 seconds when `grace_secs` is `None`.
+    pub async fn terminate_process(
+        &self,
+        name: impl Into<String>,
+        version: impl Into<String>,
+        grace_secs: Option<u64>,
+    ) -> Result<TerminateResponse, IpcError> {
+        let args = TerminateArgs {
+            name: name.into(),
+            version: version.into(),
+            grace_secs,
+        };
+        let req = Request {
+            protocol_version: PROTOCOL_VERSION,
+            verb: "terminate".to_string(),
+            args: serde_json::to_value(args)?,
+        };
+        self.decode_ok(self.request(&req).await?)
+    }
+
+    /// Send a `restart` verb and decode the typed payload.
+    pub async fn restart_process(
+        &self,
+        name: impl Into<String>,
+        version: impl Into<String>,
+    ) -> Result<RestartProcessResponse, IpcError> {
+        let args = ProcessKeyArgs {
+            name: name.into(),
+            version: version.into(),
+        };
+        let req = Request {
+            protocol_version: PROTOCOL_VERSION,
+            verb: "restart".to_string(),
+            args: serde_json::to_value(args)?,
+        };
+        self.decode_ok(self.request(&req).await?)
+    }
+
+    /// Send a `process_status` verb and decode the typed payload.
+    pub async fn process_status(
+        &self,
+        name: impl Into<String>,
+        version: impl Into<String>,
+    ) -> Result<ProcessStatusResponse, IpcError> {
+        let args = ProcessKeyArgs {
+            name: name.into(),
+            version: version.into(),
+        };
+        let req = Request {
+            protocol_version: PROTOCOL_VERSION,
+            verb: "process_status".to_string(),
+            args: serde_json::to_value(args)?,
         };
         self.decode_ok(self.request(&req).await?)
     }

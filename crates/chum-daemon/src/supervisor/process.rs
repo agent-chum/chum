@@ -74,21 +74,43 @@ pub(crate) struct MonitorContext {
 /// Spawn the child process described by `manifest.runtime` inside
 /// `artifact.install_dir`. Returns the live `Child` handle on success.
 ///
+/// stdout / stderr are redirected to per-package log files under
+/// `<install_dir>/logs/{stdout,stderr}.log` (created on first spawn
+/// if missing — `chum-install` also pre-creates `logs/` so a fresh
+/// install lands writable immediately).
+///
 /// Sets `kill_on_drop(true)` so a panicking monitor task does not
 /// leave an orphan even before [`Supervisor`]'s `Drop` runs.
+// TODO(chum-v0.x): structured log streaming for `chum logs` lands
+// in Session B.5 — today the daemon only writes files; tail / follow
+// support requires a separate IPC channel that's out of v0.1 scope.
 pub(crate) fn spawn_child(
     artifact: &InstalledArtifact,
     manifest: &Manifest,
 ) -> Result<Child, SupervisorError> {
+    let logs_dir = artifact.install_dir.join("logs");
+    std::fs::create_dir_all(&logs_dir).map_err(SupervisorError::Io)?;
+    let stdout_file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(logs_dir.join("stdout.log"))
+        .map_err(SupervisorError::Io)?;
+    let stderr_file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(logs_dir.join("stderr.log"))
+        .map_err(SupervisorError::Io)?;
+
     let mut cmd = Command::new(&manifest.runtime.command);
     cmd.args(&manifest.runtime.args)
         .envs(&manifest.runtime.env)
         .current_dir(&artifact.install_dir)
         .kill_on_drop(true)
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit());
+        .stdout(std::process::Stdio::from(stdout_file))
+        .stderr(std::process::Stdio::from(stderr_file));
 
-    cmd.spawn().map_err(|source| SupervisorError::SpawnFailed { source })
+    cmd.spawn()
+        .map_err(|source| SupervisorError::SpawnFailed { source })
 }
 
 /// Body of the monitor task. Owns the `Child`, drives the

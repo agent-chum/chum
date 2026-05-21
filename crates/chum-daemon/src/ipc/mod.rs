@@ -58,6 +58,29 @@ pub mod codes {
     pub const REQUEST_TIMEOUT: &str = "request_timeout";
     /// Unrecoverable server-side fault — bug in the daemon.
     pub const INTERNAL: &str = "internal";
+
+    // ----- Lifecycle verbs (spawn / terminate / restart / process_status) -----
+    /// The registry has no row matching `(name, version)`.
+    pub const PROCESS_NOT_INSTALLED: &str = "process_not_installed";
+    /// `spawn` for a key whose Supervisor slot is in a non-terminal
+    /// status.
+    pub const PROCESS_ALREADY_RUNNING: &str = "process_already_running";
+    /// `terminate` / `restart` for a key with no Supervisor slot.
+    pub const PROCESS_NOT_RUNNING: &str = "process_not_running";
+    /// `<install_dir>/chum-manifest.toml` is missing — install
+    /// happened before this commit landed, or the directory was
+    /// hand-edited.
+    pub const MANIFEST_MISSING_IN_INSTALL_DIR: &str = "manifest_missing_in_install_dir";
+    /// The on-disk manifest exists but `chum_core::parse_and_validate`
+    /// rejected it.
+    pub const MANIFEST_INVALID: &str = "manifest_invalid";
+    /// `tokio::process::Command::spawn` failed inside `Supervisor::spawn`.
+    pub const SPAWN_FAILED: &str = "spawn_failed";
+    /// Signal delivery failed during `terminate` / `restart`.
+    pub const KILL_FAILED: &str = "kill_failed";
+    /// The supervisor's monitor task ended without writing a terminal
+    /// status. Should not happen in normal operation.
+    pub const MONITOR_WEDGED: &str = "monitor_wedged";
 }
 
 /// A request from a client to the daemon.
@@ -146,21 +169,108 @@ pub struct StatusResponse {
     pub running_count: u32,
 }
 
-/// One entry inside [`ListProcessesResponse::processes`]. The shape
-/// is locked at v0.1; entries are always empty in this session.
+/// One entry inside [`ListProcessesResponse::processes`].
+///
+/// All fields except `name` / `version` / `status` / `restart_count`
+/// are optional — `pid` is missing when the process is between
+/// waits, `exit_code` is only present on a `failed` status.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListedProcess {
     /// Package name.
     pub name: String,
     /// Package version.
     pub version: String,
-    /// String form of the supervisor's `ProcessStatus`.
+    /// String form of the supervisor's `ProcessStatus`:
+    /// `"starting" | "running" | "restarting" | "stopped" | "failed"`.
     pub status: String,
+    /// Current OS pid; absent when the process has terminated or is
+    /// between waits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
+    /// User-driven restart count (incremented by the `restart` verb).
+    pub restart_count: u32,
+    /// Set on `status == "failed"` — the OS exit code reported by
+    /// the kernel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
 }
 
 /// Typed payload for `list_processes`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListProcessesResponse {
-    /// Currently-supervised processes. Always empty in v0.1.
+    /// Currently-supervised processes. Empty when no `spawn` has
+    /// landed since daemon startup.
     pub processes: Vec<ListedProcess>,
+}
+
+/// Typed payload for `spawn`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpawnResponse {
+    /// Pid the supervisor assigned to the freshly spawned child.
+    pub pid: u32,
+    /// RFC3339 timestamp the child was spawned at.
+    pub started_at: String,
+}
+
+/// Typed payload for `terminate`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminateResponse {
+    /// Always `true` for an ok response (the verb is action-only —
+    /// returning a discriminator field keeps the JSON envelope
+    /// non-empty, which matches the rest of the protocol).
+    pub stopped: bool,
+}
+
+/// Typed payload for `restart`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestartProcessResponse {
+    /// Pid of the new child (different from the pre-restart pid).
+    pub pid: u32,
+    /// RFC3339 timestamp the new child was spawned at.
+    pub started_at: String,
+    /// Number of times the user has invoked `restart` for this key
+    /// since the most recent `spawn`. Daemon-tracked — distinct from
+    /// the supervisor's internal restart_count which counts
+    /// policy-driven respawns.
+    pub restart_count: u32,
+}
+
+/// Typed payload for `process_status`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessStatusResponse {
+    /// Package name.
+    pub name: String,
+    /// Package version.
+    pub version: String,
+    /// String form of the supervisor's `ProcessStatus`.
+    pub status: String,
+    /// Current OS pid, when the process is alive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
+    /// User-driven restart count.
+    pub restart_count: u32,
+    /// Exit code on `status == "failed"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+}
+
+/// Args envelope shared by `spawn`, `restart`, `process_status`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessKeyArgs {
+    /// Package name from the registry / manifest.
+    pub name: String,
+    /// Package version from the registry / manifest.
+    pub version: String,
+}
+
+/// Args envelope for `terminate`. Adds an optional grace duration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminateArgs {
+    /// Package name.
+    pub name: String,
+    /// Package version.
+    pub version: String,
+    /// Seconds to wait between SIGTERM and SIGKILL. Defaults to 5.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grace_secs: Option<u64>,
 }

@@ -24,7 +24,9 @@ pub mod supervisor;
 pub use error::{IpcError, SupervisorError};
 pub use ipc::{
     DAEMON_VERSION, DaemonClient, ListProcessesResponse, ListedProcess, PROTOCOL_VERSION,
-    PingResponse, Request, Response, StatusResponse, codes, server::DaemonState,
+    PingResponse, ProcessKeyArgs, ProcessStatusResponse, Request, Response,
+    RestartProcessResponse, SpawnResponse, StatusResponse, TerminateArgs, TerminateResponse,
+    codes, server::DaemonState,
 };
 pub use supervisor::restart::BackoffPolicy;
 pub use supervisor::{ProcessHandle, ProcessKey, ProcessStatus, Supervisor};

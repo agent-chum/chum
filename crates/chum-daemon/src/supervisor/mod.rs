@@ -315,6 +315,17 @@ impl Supervisor {
             .map(|s| s.restart_count.load(Ordering::SeqCst))
     }
 
+    /// Current OS pid for `key`, or `None` if no slot exists or the
+    /// slot is between waits (status `Restarting`). The lookup is
+    /// async only to match the rest of the API surface — internally
+    /// it touches a single atomic load.
+    pub async fn pid(&self, key: &ProcessKey) -> Option<u32> {
+        let map = self.processes.lock().ok()?;
+        let slot = map.get(key)?;
+        let pid = slot.pid.load(Ordering::SeqCst);
+        if pid > 0 { Some(pid as u32) } else { None }
+    }
+
     fn handles_for(&self, key: &ProcessKey) -> Option<SlotHandles> {
         let map = self.processes.lock().ok()?;
         map.get(key).map(|s| s.handles())
