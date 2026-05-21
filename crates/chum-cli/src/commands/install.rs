@@ -61,17 +61,7 @@ pub async fn run(args: InstallArgs) -> Result<(), UserFacingError> {
     let manifest =
         chum_core::parse_and_validate(&manifest_text).map_err(UserFacingError::Manifest)?;
 
-    let root = match args.root.clone() {
-        Some(r) => r,
-        None => chum_install::chum_home().map_err(|e| match e {
-            chum_install::InstallError::Io(io)
-                if io.kind() == std::io::ErrorKind::NotFound =>
-            {
-                UserFacingError::ChumHomeUnresolved
-            }
-            other => UserFacingError::Install(other),
-        })?,
-    };
+    let root = crate::commands::resolve_root(args.root.clone())?;
 
     if args.dry_run {
         output::emit_dry_run(&manifest, &root, args.json);

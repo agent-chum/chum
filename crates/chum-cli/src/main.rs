@@ -26,12 +26,14 @@ struct Cli {
     command: Command,
 }
 
-/// Subcommands exposed by the CLI. v0.1 ships `install` only; more
-/// land in subsequent sessions.
+/// Subcommands exposed by the CLI. v0.1 ships `install` and `list`;
+/// more land in subsequent sessions.
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Install an MCP server from a manifest TOML file.
     Install(commands::install::InstallArgs),
+    /// List installed MCP servers recorded in the local registry.
+    List(commands::list::ListArgs),
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -41,6 +43,10 @@ async fn main() {
         Command::Install(args) => {
             let json = args.json;
             (commands::install::run(args).await, json)
+        }
+        Command::List(args) => {
+            let json = args.json;
+            (commands::list::run(args).await, json)
         }
     };
     if let Err(e) = result {
