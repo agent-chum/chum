@@ -38,6 +38,12 @@ pub enum DaemonSub {
     Ping(DaemonCommonArgs),
     /// Print the daemon's status snapshot.
     Status(DaemonCommonArgs),
+    /// Install the chumd LaunchAgent so it auto-starts on login.
+    InstallService(super::daemon_service::InstallServiceArgs),
+    /// Stop and remove the chumd LaunchAgent.
+    UninstallService(super::daemon_service::UninstallServiceArgs),
+    /// Show the LaunchAgent's current status via launchctl.
+    ServiceStatus(super::daemon_service::ServiceStatusArgs),
 }
 
 /// Top-level dispatch for `chum daemon`.
@@ -45,6 +51,15 @@ pub async fn run(sub: DaemonSub) -> Result<(), UserFacingError> {
     match sub {
         DaemonSub::Ping(args) => ping(args).await,
         DaemonSub::Status(args) => status(args).await,
+        DaemonSub::InstallService(args) => {
+            super::daemon_service::run_install_service(args).await
+        }
+        DaemonSub::UninstallService(args) => {
+            super::daemon_service::run_uninstall_service(args).await
+        }
+        DaemonSub::ServiceStatus(args) => {
+            super::daemon_service::run_service_status(args).await
+        }
     }
 }
 

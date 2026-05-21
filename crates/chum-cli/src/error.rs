@@ -140,6 +140,22 @@ pub enum UserFacingError {
         /// install_dir whose `logs/` is empty.
         install_dir: PathBuf,
     },
+    /// `chum daemon install-service` refused because a plist file
+    /// already exists at the target path. Caller can re-run with
+    /// `--force` to replace it.
+    ServiceAlreadyInstalled {
+        /// Path that's already taken.
+        path: PathBuf,
+    },
+    /// A `launchctl` / filesystem command run by the service
+    /// subcommands failed. Carries the command string for diagnostics
+    /// and the captured stderr.
+    ServiceCommandFailed {
+        /// Command line we tried to run.
+        cmd: String,
+        /// Captured stderr (or a synthesized reason string).
+        stderr: String,
+    },
 }
 
 impl UserFacingError {
@@ -206,6 +222,8 @@ impl UserFacingError {
             UserFacingError::ProcessNotRunning { .. } => "process_not_running",
             UserFacingError::ManifestMissing { .. } => "manifest_missing_in_install_dir",
             UserFacingError::LogsUnavailable { .. } => "logs_unavailable",
+            UserFacingError::ServiceAlreadyInstalled { .. } => "service_already_installed",
+            UserFacingError::ServiceCommandFailed { .. } => "service_command_failed",
         }
     }
 
@@ -348,6 +366,15 @@ impl UserFacingError {
                     "no logs yet for '{name}' {version} — start it once with 'chum start {name}' to populate {}/logs/",
                     install_dir.display(),
                 )
+            }
+            UserFacingError::ServiceAlreadyInstalled { path } => {
+                format!(
+                    "LaunchAgent plist already exists at {} — re-run with --force to replace it",
+                    path.display(),
+                )
+            }
+            UserFacingError::ServiceCommandFailed { cmd, stderr } => {
+                format!("'{cmd}' failed: {stderr}")
             }
         }
     }

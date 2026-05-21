@@ -95,6 +95,9 @@ async fn main() {
             let json = match &sub {
                 commands::daemon::DaemonSub::Ping(a) => a.json,
                 commands::daemon::DaemonSub::Status(a) => a.json,
+                commands::daemon::DaemonSub::InstallService(a) => a.json,
+                commands::daemon::DaemonSub::UninstallService(a) => a.json,
+                commands::daemon::DaemonSub::ServiceStatus(a) => a.json,
             };
             (commands::daemon::run(sub).await, json)
         }

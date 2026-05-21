@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use crate::error::UserFacingError;
 
 pub mod daemon;
+pub mod daemon_service;
 pub mod install;
 pub mod list;
 pub mod logs;

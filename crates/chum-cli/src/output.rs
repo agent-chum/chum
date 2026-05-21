@@ -208,6 +208,102 @@ pub fn emit_restarted(
     }
 }
 
+/// `chum daemon install-service` confirmation. When `no_load` is
+/// true (the test path), the message reflects that.
+pub fn emit_service_installed(
+    cfg: &crate::commands::daemon_service::ServiceConfig,
+    no_load: bool,
+    json: bool,
+) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "service_installed": {
+                "label": crate::commands::daemon_service::LAUNCHD_LABEL,
+                "plist_path": cfg.plist_path.display().to_string(),
+                "chumd_path": cfg.chumd_path.display().to_string(),
+                "chum_home": cfg.chum_home.display().to_string(),
+                "loaded": !no_load,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!(
+            "LaunchAgent installed at {} ({})",
+            cfg.plist_path.display(),
+            if no_load {
+                "plist written, launchctl load skipped"
+            } else {
+                "loaded via launchctl"
+            },
+        );
+    }
+}
+
+/// `chum daemon uninstall-service` confirmation. `removed` is `false`
+/// when no plist existed to begin with (still success — idempotent).
+pub fn emit_service_uninstalled(
+    plist_path: &std::path::Path,
+    removed: bool,
+    json: bool,
+) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "service_uninstalled": {
+                "label": crate::commands::daemon_service::LAUNCHD_LABEL,
+                "plist_path": plist_path.display().to_string(),
+                "removed": removed,
+            }
+        });
+        println!("{envelope}");
+    } else if removed {
+        println!("LaunchAgent uninstalled ({} removed)", plist_path.display());
+    } else {
+        println!(
+            "LaunchAgent already absent ({} did not exist)",
+            plist_path.display(),
+        );
+    }
+}
+
+/// `chum daemon service-status` output.
+pub fn emit_service_status(
+    status: &crate::commands::daemon_service::ServiceStatus,
+    json: bool,
+) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "service_status": {
+                "label": crate::commands::daemon_service::LAUNCHD_LABEL,
+                "loaded": status.loaded,
+                "pid": status.pid,
+                "last_exit_status": status.last_exit_status,
+            }
+        });
+        println!("{envelope}");
+    } else if !status.loaded {
+        println!(
+            "LaunchAgent '{}' is not loaded",
+            crate::commands::daemon_service::LAUNCHD_LABEL,
+        );
+    } else {
+        println!(
+            "LaunchAgent '{}'",
+            crate::commands::daemon_service::LAUNCHD_LABEL,
+        );
+        match status.pid {
+            Some(p) => println!("  pid:               {p}"),
+            None => println!("  pid:               (not running)"),
+        }
+        match status.last_exit_status {
+            Some(c) => println!("  last_exit_status:  {c}"),
+            None => println!("  last_exit_status:  (none)"),
+        }
+    }
+}
+
 /// `chum logs` output. In human mode prints the daemon's `content`
 /// field directly to stdout (no decoration — it's already shaped for
 /// human consumption, including section headers when stream is
