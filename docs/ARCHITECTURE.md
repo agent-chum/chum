@@ -127,6 +127,63 @@ What the cli adds on top of the three crates:
 
 `commands/install.rs`, `commands/list.rs`, and `commands/uninstall.rs` each carry a `// TODO(chum-v0.x): route through chum-daemon protocol once it lands.` marker at the top. Future contributors should not extend the direct-composition surface — new subcommands wait for the daemon protocol.
 
+## chumd IPC protocol (v0.1)
+
+The `chumd` background daemon exposes a tiny diagnostic surface over a Unix domain socket at `<chum_home>/daemon.sock` (chmod `0600`). The wire format is **JSON Lines** — one request per connection, terminated by `\n`, then one response, then the daemon closes. Pipelining and streaming verbs are deferred to a later session.
+
+### Request
+
+```json
+{"protocol_version":1,"verb":"ping","args":null}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `protocol_version` | unsigned integer | Must equal `1` for this daemon build. Mismatch → `unsupported_protocol_version`. |
+| `verb` | string | Routing key. v0.1 verbs: `ping`, `status`, `list_processes`. |
+| `args` | JSON | Optional verb-specific payload. Always `null` for the v0.1 verbs. |
+
+### Response — ok
+
+```json
+{"protocol_version":1,"status":"ok","data":{...}}
+```
+
+### Response — error
+
+```json
+{"protocol_version":1,"status":"error","code":"unknown_verb","message":"..."}
+```
+
+`code` is one of the stable strings in `crates/chum-daemon/src/ipc/mod.rs::codes`. Scripts pattern-match on these:
+
+| Code | When it fires |
+|---|---|
+| `unsupported_protocol_version` | Request's `protocol_version` differs from the daemon's `PROTOCOL_VERSION`. |
+| `unknown_verb` | Verb string is not in the dispatch table. |
+| `invalid_request` | Request body is empty, not JSON, or fails the `Request` schema. |
+| `request_too_large` | Request line exceeded the daemon's hard 64 KiB cap. |
+| `request_timeout` | Client opened a connection and sent nothing within the daemon's 5s read window. |
+| `internal` | Unrecoverable server-side fault. Bug in chumd; should not happen on the v0.1 verb set. |
+
+### Verbs (v0.1)
+
+| Verb | `data` shape |
+|---|---|
+| `ping` | `{ "daemon_version": "0.1.0", "uptime_secs": N, "installed_count": N }` |
+| `status` | `{ "pid": N, "started_at": "<rfc3339>", "installed_count": N, "running_count": N }` |
+| `list_processes` | `{ "processes": [ { "name", "version", "status" }, … ] }` — always empty in v0.1; locked shape for Session B. |
+
+`installed_count` is a snapshot taken once at daemon startup (`chum-registry::list_all()` on the boot root). It is *not* refreshed for the daemon's lifetime in v0.1 — Session B introduces a refresh path triggered by install / uninstall. `running_count` is `Supervisor::list().len()`, which is always 0 in v0.1 because no verb spawns into the supervisor yet.
+
+### Graceful shutdown
+
+`chumd` installs handlers for `SIGTERM` and `SIGINT`. On either, the accept loop stops, in-flight handlers drain up to a 5s ceiling, the socket file is removed, and the process exits `0`. A `SIGKILL`'d chumd leaves a stale socket file behind; the next `chumd` start `connect()`-tests the existing path and either fails fast (live chumd) or removes the stale file (no connection). There is no pidfile — a SIGKILL'd run can't update one, so it'd lie.
+
+### Client
+
+`chum-daemon::DaemonClient` is the canonical client. It exposes a low-level `request(&Request)` for scripts driving the protocol directly plus typed `ping() / status() / list_processes()` methods that decode `data` into typed structs. The cli's `chum daemon ping / status` subcommands wrap it.
+
 ## chum-registry storage (v0.1)
 
 ### Schema

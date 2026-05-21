@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 chum-core.workspace = true
+chum-daemon.workspace = true
 chum-install.workspace = true
 chum-registry.workspace = true
 clap.workspace = true

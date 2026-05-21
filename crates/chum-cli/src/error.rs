@@ -82,6 +82,21 @@ pub enum UserFacingError {
         /// Underlying I/O error.
         source: std::io::Error,
     },
+    /// Could not reach the chumd daemon over its IPC socket.
+    DaemonUnreachable {
+        /// Socket path the cli tried to connect to.
+        path: PathBuf,
+        /// Underlying I/O error from `connect`.
+        source: std::io::Error,
+    },
+    /// The daemon responded but the response could not be
+    /// interpreted: malformed JSON, unexpected shape, or an explicit
+    /// error envelope. Carries a free-form reason; do not
+    /// pattern-match on the string.
+    DaemonProtocol {
+        /// Free-form description of the failure.
+        reason: String,
+    },
 }
 
 impl UserFacingError {
@@ -138,6 +153,8 @@ impl UserFacingError {
             UserFacingError::NotInstalled { .. } => "not_installed",
             UserFacingError::AmbiguousVersion { .. } => "ambiguous_version",
             UserFacingError::RemoveFailed { .. } => "remove_failed",
+            UserFacingError::DaemonUnreachable { .. } => "daemon_unreachable",
+            UserFacingError::DaemonProtocol { .. } => "daemon_protocol_error",
         }
     }
 
@@ -244,6 +261,15 @@ impl UserFacingError {
             }
             UserFacingError::RemoveFailed { path, source } => {
                 format!("could not remove {}: {source}", path.display())
+            }
+            UserFacingError::DaemonUnreachable { path, source } => {
+                format!(
+                    "cannot reach chumd at {}: {source} (is chumd running?)",
+                    path.display(),
+                )
+            }
+            UserFacingError::DaemonProtocol { reason } => {
+                format!("daemon protocol error: {reason}")
             }
         }
     }

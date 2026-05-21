@@ -59,6 +59,36 @@ cargo run --bin chum -- uninstall foo --keep-files --json   # registry-only dele
 
 All three commands compose the same three lower-level crates: `chum-core` parses + validates the manifest, `chum-install` does the filesystem work (symlink for local, fetch + checksum + extract for binary, subprocess for npm), and `chum-registry` persists or reads the row. The daemon will own this composition once it ships in v0.1 — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the boundary.
 
+### Talking to the daemon
+
+The `chumd` background daemon binary is now wired up with a Unix-socket IPC surface. Start it manually for now (launchd integration ships in a later session):
+
+```sh
+# Build + start chumd against an explicit root (defaults to chum_home()).
+cargo run --bin chumd -- --root /tmp/chum-demo &
+
+# Two diagnostic verbs are exposed today: ping and status.
+cargo run --bin chum -- daemon ping --root /tmp/chum-demo
+#  → chumd ok (uptime 3s, 0 installed)
+
+cargo run --bin chum -- daemon status --root /tmp/chum-demo
+#  → chumd status
+#      pid:              83961
+#      started_at:       2026-05-21T13:30:00+00:00
+#      installed_count:  0
+#      running_count:    0
+
+# --json on either subcommand returns the standard ok-envelope for scripts.
+cargo run --bin chum -- daemon ping --root /tmp/chum-demo --json
+
+# --socket-path overrides <root>/daemon.sock on both binaries; useful for
+# running multiple chumd instances side-by-side during development.
+cargo run --bin chumd -- --socket-path /tmp/alt.sock &
+cargo run --bin chum -- daemon ping --socket-path /tmp/alt.sock
+```
+
+`chumd` shuts down cleanly on SIGTERM / SIGINT, removes its socket file on exit, and refuses to start over a live socket (returning `another chumd appears to be running`). Stale socket files left by SIGKILL'd previous runs are auto-recovered. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the wire-protocol spec and the stable error codes.
+
 ## Status
 
 `v0.0.1` — repository scaffold only. v0.1 (CLI + daemon + 10–15 first-party manifests) is targeted for 90 days out. See [`ROADMAP.md`](ROADMAP.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

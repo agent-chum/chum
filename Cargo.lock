@@ -182,6 +182,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "chum-core",
+ "chum-daemon",
  "chum-install",
  "chum-registry",
  "clap",

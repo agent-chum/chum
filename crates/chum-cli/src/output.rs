@@ -11,6 +11,7 @@
 use std::path::Path;
 
 use chum_core::Manifest;
+use chum_daemon::{PingResponse, StatusResponse};
 use chum_install::{InstalledArtifact, SourceKind};
 use chum_registry::RegistryArtifact;
 
@@ -134,6 +135,77 @@ pub fn emit_uninstall_cancelled(target: &RegistryArtifact, json: bool) {
         println!("{envelope}");
     } else {
         println!("Uninstall cancelled.");
+    }
+}
+
+/// Confirmation that the daemon answered a `ping`.
+///
+/// JSON envelope:
+/// ```json
+/// {
+///   "status": "ok",
+///   "daemon": {
+///     "version": "0.1.0",
+///     "uptime_secs": 42,
+///     "installed_count": 3
+///   }
+/// }
+/// ```
+///
+/// Human form: `chumd ok (uptime Xs, N installed)`.
+pub fn emit_daemon_ping(ping: &PingResponse, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "daemon": {
+                "version": ping.daemon_version,
+                "uptime_secs": ping.uptime_secs,
+                "installed_count": ping.installed_count,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!(
+            "chumd ok (uptime {}s, {} installed)",
+            ping.uptime_secs, ping.installed_count,
+        );
+    }
+}
+
+/// Render the daemon's `status` envelope.
+///
+/// JSON envelope:
+/// ```json
+/// {
+///   "status": "ok",
+///   "daemon": {
+///     "pid": 12345,
+///     "started_at": "2026-05-21T13:30:00+00:00",
+///     "installed_count": 3,
+///     "running_count": 0
+///   }
+/// }
+/// ```
+///
+/// Human form: a small key/value table on stdout.
+pub fn emit_daemon_status(status: &StatusResponse, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "daemon": {
+                "pid": status.pid,
+                "started_at": status.started_at,
+                "installed_count": status.installed_count,
+                "running_count": status.running_count,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!("chumd status");
+        println!("  pid:              {}", status.pid);
+        println!("  started_at:       {}", status.started_at);
+        println!("  installed_count:  {}", status.installed_count);
+        println!("  running_count:    {}", status.running_count);
     }
 }
 

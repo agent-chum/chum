@@ -10,6 +10,7 @@ use std::path::PathBuf;
 
 use crate::error::UserFacingError;
 
+pub mod daemon;
 pub mod install;
 pub mod list;
 pub mod uninstall;

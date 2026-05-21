@@ -26,8 +26,9 @@ struct Cli {
     command: Command,
 }
 
-/// Subcommands exposed by the CLI. v0.1 ships `install`, `list`, and
-/// `uninstall`; more land in subsequent sessions.
+/// Subcommands exposed by the CLI. v0.1 ships `install`, `list`,
+/// `uninstall`, and the `daemon` diagnostic group; more land in
+/// subsequent sessions.
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Install an MCP server from a manifest TOML file.
@@ -36,6 +37,11 @@ enum Command {
     List(commands::list::ListArgs),
     /// Remove an installed MCP server's files and registry row.
     Uninstall(commands::uninstall::UninstallArgs),
+    /// Diagnostic + control operations against the chumd daemon.
+    Daemon {
+        #[command(subcommand)]
+        sub: commands::daemon::DaemonSub,
+    },
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -53,6 +59,13 @@ async fn main() {
         Command::Uninstall(args) => {
             let json = args.json;
             (commands::uninstall::run(args).await, json)
+        }
+        Command::Daemon { sub } => {
+            let json = match &sub {
+                commands::daemon::DaemonSub::Ping(a) => a.json,
+                commands::daemon::DaemonSub::Status(a) => a.json,
+            };
+            (commands::daemon::run(sub).await, json)
         }
     };
     if let Err(e) = result {
