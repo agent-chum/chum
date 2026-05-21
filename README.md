@@ -149,6 +149,30 @@ cargo run --bin chum -- logs <name> --json --root /tmp/chum-demo
 
 `--follow` (live tailing) lands in v0.2 alongside log rotation — today's logs accumulate verbatim across spawns / restarts in the same files.
 
+### Running CHUM as a service (auto-start on login, macOS)
+
+`chum daemon install-service` writes a `~/Library/LaunchAgents/cloud.chum.daemon.plist` and loads it via `launchctl`. The agent runs `chumd --root <your CHUM_HOME>` whenever you log in and restarts it on crash.
+
+```sh
+# Install the LaunchAgent (one-time setup).
+cargo run --bin chum -- daemon install-service
+
+# Verify it's running.
+cargo run --bin chum -- daemon service-status
+
+# Replace an existing install (e.g. after upgrading chumd):
+cargo run --bin chum -- daemon install-service --force
+
+# Stop + remove the LaunchAgent.
+cargo run --bin chum -- daemon uninstall-service
+```
+
+**Caveat — login-required, not boot-time.** macOS LaunchAgents run only when the user is logged in (FileVault-encrypted volumes mount on login, not at boot). This is the same tradeoff every other LaunchAgent in the wild accepts. If you need boot-time auto-start, you need a LaunchDaemon (system-wide, runs as root) — that's a different security model and lands in a later session if there's demand.
+
+**Env vars baked into the plist.** `chum daemon install-service` reads `$PATH` and `$CHUM_HOME` at install-service time and bakes them directly into the plist's `EnvironmentVariables` dict. `launchctl setenv` is unreliable for LaunchAgents and intentionally not used. If your `$PATH` changes (e.g. you switch shells or install new toolchains), re-run `chum daemon install-service --force`.
+
+Logs from the LaunchAgent itself go to `~/Library/Logs/chum-daemon.{stdout,stderr}.log`. Per-package logs (the ones `chum logs` reads) still live under `<install_dir>/logs/` as before.
+
 ## Status
 
 `v0.0.1` — repository scaffold only. v0.1 (CLI + daemon + 10–15 first-party manifests) is targeted for 90 days out. See [`ROADMAP.md`](ROADMAP.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

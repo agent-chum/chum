@@ -297,6 +297,76 @@ Migrations are an append-only list. Each entry brings the database from schema v
 
 `Registry` is `!Sync` (it wraps a single `rusqlite::Connection`). The daemon owns one instance and serialises access; tests instantiate one per `TempDir`.
 
+## launchd integration (v0.1, macOS)
+
+`chum daemon install-service` writes a LaunchAgent plist at `~/Library/LaunchAgents/cloud.chum.daemon.plist` and runs `launchctl load` against it. The agent owns the daemon's lifecycle from then on — auto-start on user login, restart on crash, clean shutdown on logout.
+
+```
+chum daemon install-service
+        │
+        ▼
+ServiceConfig::resolve
+   - chumd_path  = current_exe sibling, override via --chumd-path
+   - chum_home   = chum_home(), override via --root
+   - plist_path  = ~/Library/LaunchAgents/cloud.chum.daemon.plist
+   - log paths   = ~/Library/Logs/chum-daemon.{stdout,stderr}.log
+   - PATH        = current $PATH baked verbatim into the plist
+        │
+        ▼
+render_plist (format! template, xml_escape on paths)
+        │
+        ▼
+write to plist_path (chmod 644)
+        │
+        ▼
+launchctl load <plist_path>
+```
+
+### Plist schema (locked at v0.1)
+
+```xml
+<plist version="1.0"><dict>
+    <key>Label</key>                <string>cloud.chum.daemon</string>
+    <key>ProgramArguments</key>     <array>
+                                       <string>{chumd_path}</string>
+                                       <string>--root</string>
+                                       <string>{chum_home}</string>
+                                    </array>
+    <key>RunAtLoad</key>            <true/>
+    <key>KeepAlive</key>            <dict>
+                                       <key>SuccessfulExit</key>
+                                       <false/>
+                                    </dict>
+    <key>EnvironmentVariables</key> <dict>
+                                       <key>PATH</key>
+                                       <string>{path_env}</string>
+                                       <key>CHUM_HOME</key>
+                                       <string>{chum_home}</string>
+                                    </dict>
+    <key>StandardOutPath</key>      <string>{log_dir}/chum-daemon.stdout.log</string>
+    <key>StandardErrorPath</key>    <string>{log_dir}/chum-daemon.stderr.log</string>
+    <key>WorkingDirectory</key>     <string>{chum_home}</string>
+</dict></plist>
+```
+
+`KeepAlive.SuccessfulExit = false` means: restart the daemon on crash (non-zero exit), but don't restart it on a clean exit. Clean exits are the SIGTERM / SIGINT-driven graceful shutdown path; restarting then would loop chumd forever against a user-issued stop.
+
+### Env vars baked, not `launchctl setenv`
+
+`launchctl setenv` is documented but does not propagate reliably for LaunchAgents in practice — affected sessions, stale values across reboots, no clean way to scope per-Label. CHUM bakes `PATH` + `CHUM_HOME` directly into the plist's `EnvironmentVariables` dict at `install-service` time. If the user's `$PATH` changes (new toolchain, new shell), they re-run `chum daemon install-service --force` to refresh the plist. The decision is documented in `commands/daemon_service.rs::ServiceConfig::resolve`.
+
+### Login-only, not boot-time
+
+LaunchAgents run only when the user is logged in (FileVault volumes mount on login, not at boot — the user's home directory isn't readable to root before login). Boot-time auto-start needs a LaunchDaemon (system-wide, runs as root), which has a different security model and is deferred to a later session.
+
+### Zombie / re-install path
+
+`install-service --force` calls `launchctl unload` (best-effort, ignored failure) before overwriting the plist + re-loading. This handles "the user upgraded chumd but the old LaunchAgent is still loaded" — a clean re-install in one command. `uninstall-service` is idempotent: unload + remove, both no-op if the plist is already gone.
+
+### Status via `launchctl list`
+
+`chum daemon service-status` runs `launchctl list cloud.chum.daemon` and line-parses the OpenStep-format output for `"PID"` and `"LastExitStatus"`. No `plist` crate dependency — the output isn't XML, it's NeXTSTEP-style, and a 20-line line scanner handles the two fields the cli surfaces. Implementation in `commands/daemon_service.rs::parse_int_field`.
+
 ## Invariants
 
 These are enforced as coding rules in [`CLAUDE.md`](../CLAUDE.md) and reviewed at every PR:
