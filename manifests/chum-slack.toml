@@ -1,0 +1,55 @@
+# chum first-party manifest for @modelcontextprotocol/server-slack.
+#
+# ----------------------------------------------------------------------
+# EDIT BEFORE INSTALL
+#   runtime.env.SLACK_BOT_TOKEN: your Slack bot's xoxb-* token.
+#   runtime.env.SLACK_TEAM_ID: your Slack workspace's team ID (T...).
+# ----------------------------------------------------------------------
+
+schema_version = "0.1"
+
+[package]
+name = "slack"
+version = "0.1.0"
+description = "Anthropic's official Slack MCP server — read channel history, post messages, manage threads."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["communication", "slack", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-slack"
+version = "2025.4.25"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-slack"]
+
+[runtime.env]
+SLACK_BOT_TOKEN = "CHANGE_ME"
+SLACK_TEAM_ID = "CHANGE_ME"
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = [
+    "slack_list_channels",
+    "slack_post_message",
+    "slack_reply_to_thread",
+    "slack_add_reaction",
+    "slack_get_channel_history",
+    "slack_get_thread_replies",
+    "slack_get_users",
+    "slack_get_user_profile",
+]
+resources = []
+prompts = []

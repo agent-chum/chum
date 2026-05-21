@@ -1,0 +1,51 @@
+# chum first-party manifest for @modelcontextprotocol/server-puppeteer.
+#
+# Headless-browser automation. No edits required — the server
+# downloads and manages its own Chromium on first run.
+#
+# Note: the first `chum start puppeteer` will be slow while
+# puppeteer downloads its bundled Chromium (~200 MB). Subsequent
+# starts are fast.
+
+schema_version = "0.1"
+
+[package]
+name = "puppeteer"
+version = "0.1.0"
+description = "Anthropic's official puppeteer MCP server — headless browser automation (navigate, screenshot, click, fill)."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["browser", "automation", "puppeteer", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-puppeteer"
+version = "2025.5.12"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-puppeteer"]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 30  # first launch downloads Chromium
+shutdown_grace_sec = 10
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = [
+    "puppeteer_navigate",
+    "puppeteer_screenshot",
+    "puppeteer_click",
+    "puppeteer_fill",
+    "puppeteer_select",
+    "puppeteer_hover",
+    "puppeteer_evaluate",
+]
+resources = []
+prompts = []

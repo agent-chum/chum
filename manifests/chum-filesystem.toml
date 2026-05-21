@@ -1,0 +1,61 @@
+# chum first-party manifest for @modelcontextprotocol/server-filesystem.
+#
+# ----------------------------------------------------------------------
+# EDIT BEFORE INSTALL
+#   runtime.args[2]: replace `/Users/CHANGE_ME/Documents` with the
+#   absolute path(s) you want this MCP server to be allowed to read
+#   and write. The filesystem server treats each positional arg after
+#   the package name as a separately-allowed root; add more entries
+#   to args to grant access to additional directories.
+# ----------------------------------------------------------------------
+
+schema_version = "0.1"
+
+[package]
+name = "filesystem"
+version = "0.1.0"
+description = "Anthropic's official filesystem MCP server — read/write files within explicitly allowed directories."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["filesystem", "files", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-filesystem"
+version = "2026.1.14"
+
+[runtime]
+command = "npx"
+args = [
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "/Users/CHANGE_ME/Documents",
+]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = [
+    "read_file",
+    "read_multiple_files",
+    "write_file",
+    "edit_file",
+    "list_directory",
+    "create_directory",
+    "delete_file",
+    "move_file",
+    "search_files",
+    "get_file_info",
+    "list_allowed_directories",
+]
+resources = []
+prompts = []

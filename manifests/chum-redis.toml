@@ -1,0 +1,50 @@
+# chum first-party manifest for @modelcontextprotocol/server-redis.
+#
+# ----------------------------------------------------------------------
+# EDIT BEFORE INSTALL
+#   runtime.args[2]: connection URL to your Redis instance, e.g.
+#   redis://localhost:6379 (default) or redis://user:pass@host:port/db.
+# ----------------------------------------------------------------------
+#
+# Substitutes for the spec's `server-sqlite` manifest, which is
+# Python-only (uvx). When chum gains Pypi source support, a separate
+# chum-sqlite manifest can land alongside this one.
+
+schema_version = "0.1"
+
+[package]
+name = "redis"
+version = "0.1.0"
+description = "Anthropic's official Redis MCP server — get/set/delete/list against a running Redis instance."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["database", "kv", "redis", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-redis"
+version = "2025.4.25"
+
+[runtime]
+command = "npx"
+args = [
+    "-y",
+    "@modelcontextprotocol/server-redis",
+    "redis://localhost:6379",
+]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = ["set", "get", "delete", "list"]
+resources = []
+prompts = []

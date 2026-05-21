@@ -1,0 +1,38 @@
+# chum first-party manifest for @modelcontextprotocol/server-sequential-thinking.
+#
+# No edits required — this server has no env vars or path args.
+
+schema_version = "0.1"
+
+[package]
+name = "sequential-thinking"
+version = "0.1.0"
+description = "Anthropic's official sequential-thinking MCP server — step-by-step structured reasoning."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["reasoning", "thinking", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-sequential-thinking"
+version = "2025.12.18"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = ["sequentialthinking"]
+resources = []
+prompts = []

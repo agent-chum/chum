@@ -1,0 +1,54 @@
+# chum first-party manifest for @modelcontextprotocol/server-memory.
+#
+# Knowledge-graph memory backed by a local JSON file. The default
+# storage path is `memory.json` in the install_dir; override via the
+# MEMORY_FILE_PATH env var if you want persistence elsewhere.
+#
+# Optional edit:
+#   runtime.env.MEMORY_FILE_PATH: absolute path to the knowledge-graph
+#   JSON file. Leave commented out to use the default.
+
+schema_version = "0.1"
+
+[package]
+name = "memory"
+version = "0.1.0"
+description = "Anthropic's official memory MCP server — persistent knowledge-graph storage backed by a JSON file."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["memory", "knowledge-graph", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-memory"
+version = "2026.1.26"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-memory"]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = [
+    "create_entities",
+    "delete_entities",
+    "add_observations",
+    "delete_observations",
+    "create_relations",
+    "delete_relations",
+    "read_graph",
+    "search_nodes",
+    "open_nodes",
+]
+resources = []
+prompts = []

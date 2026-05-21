@@ -1,0 +1,47 @@
+# chum first-party manifest for @modelcontextprotocol/server-postgres.
+#
+# ----------------------------------------------------------------------
+# EDIT BEFORE INSTALL
+#   runtime.args[2]: replace the connection string with one that points
+#   at your database. The server takes a single positional arg in
+#   libpq URI form: postgresql://user:password@host:port/database
+# ----------------------------------------------------------------------
+
+schema_version = "0.1"
+
+[package]
+name = "postgres"
+version = "0.1.0"
+description = "Anthropic's official Postgres MCP server — read-only SQL query access to a Postgres database."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["database", "sql", "postgres", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-postgres"
+version = "0.6.2"
+
+[runtime]
+command = "npx"
+args = [
+    "-y",
+    "@modelcontextprotocol/server-postgres",
+    "postgresql://localhost:5432/postgres",
+]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = ["query"]
+resources = []
+prompts = []

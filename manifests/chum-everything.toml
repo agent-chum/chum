@@ -1,0 +1,54 @@
+# chum first-party manifest for @modelcontextprotocol/server-everything.
+#
+# The "everything" reference server exposes the full MCP surface for
+# testing and demos — useful for verifying that a CHUM install works
+# end-to-end against a real server before wiring up production
+# manifests. No env vars or path args required.
+#
+# Substitutes for the spec's `server-fetch` manifest, which is
+# Python-only (uvx). The reference server is a more useful smoke
+# target anyway — it exercises every MCP capability category.
+
+schema_version = "0.1"
+
+[package]
+name = "everything"
+version = "0.1.0"
+description = "Anthropic's official reference MCP server — demonstrates every MCP capability category (tools, resources, prompts, sampling)."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["demo", "reference", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-everything"
+version = "2026.1.26"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-everything"]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = [
+    "echo",
+    "add",
+    "longRunningOperation",
+    "sampleLLM",
+    "getTinyImage",
+    "printEnv",
+    "annotatedMessage",
+    "getResourceReference",
+]
+resources = []
+prompts = ["simple_prompt", "complex_prompt"]

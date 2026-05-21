@@ -1,0 +1,47 @@
+# chum first-party manifest for @modelcontextprotocol/server-brave-search.
+#
+# ----------------------------------------------------------------------
+# EDIT BEFORE INSTALL
+#   runtime.env.BRAVE_API_KEY: replace `CHANGE_ME` with your Brave
+#   Search API key (https://api.search.brave.com/). v0.1 reads env
+#   values verbatim from the manifest; `chum env set` integration
+#   for runtime-bound secrets ships in a later session.
+# ----------------------------------------------------------------------
+
+schema_version = "0.1"
+
+[package]
+name = "brave-search"
+version = "0.1.0"
+description = "Anthropic's official Brave Search MCP server — web search via the Brave Search API."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["search", "web", "brave", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-brave-search"
+version = "0.6.2"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-brave-search"]
+
+[runtime.env]
+BRAVE_API_KEY = "CHANGE_ME"
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = ["brave_web_search", "brave_local_search"]
+resources = []
+prompts = []

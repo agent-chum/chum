@@ -1,0 +1,70 @@
+# chum first-party manifest for @modelcontextprotocol/server-github.
+#
+# ----------------------------------------------------------------------
+# EDIT BEFORE INSTALL
+#   runtime.env.GITHUB_PERSONAL_ACCESS_TOKEN: a fine-grained PAT
+#   (https://github.com/settings/personal-access-tokens) with the
+#   repo / read:org scopes you actually want this agent to use.
+#   v0.1 has no permission enforcement (see Phase 4 / v0.2) — the
+#   token IS the trust boundary today.
+# ----------------------------------------------------------------------
+#
+# Substitutes for the spec's `server-git` manifest, which is
+# Python-only (uvx). When chum gains Pypi source support, a separate
+# chum-git manifest can land alongside this one.
+
+schema_version = "0.1"
+
+[package]
+name = "github"
+version = "0.1.0"
+description = "Anthropic's official GitHub MCP server — repo browsing, file ops, issues, pull requests, commits."
+license = "MIT"
+authors = ["chum first-party manifests"]
+tags = ["dev", "github", "official"]
+
+[source]
+kind = "npm"
+package = "@modelcontextprotocol/server-github"
+version = "2025.4.8"
+
+[runtime]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+
+[runtime.env]
+GITHUB_PERSONAL_ACCESS_TOKEN = "CHANGE_ME"
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "on-failure"
+startup_timeout_sec = 10
+shutdown_grace_sec = 5
+
+[health]
+kind = "process"
+
+[capabilities]
+tools = [
+    "create_or_update_file",
+    "search_repositories",
+    "create_repository",
+    "get_file_contents",
+    "push_files",
+    "create_issue",
+    "create_pull_request",
+    "fork_repository",
+    "create_branch",
+    "list_commits",
+    "list_issues",
+    "update_issue",
+    "add_issue_comment",
+    "search_code",
+    "search_issues",
+    "search_users",
+    "get_issue",
+]
+resources = []
+prompts = []
