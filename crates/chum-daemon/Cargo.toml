@@ -8,11 +8,16 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "chumd"
+path = "src/bin/chumd.rs"
+
 [dependencies]
 chrono.workspace = true
 chum-core.workspace = true
 chum-install.workspace = true
 chum-registry.workspace = true
+clap.workspace = true
 nix.workspace = true
 serde = { workspace = true }
 serde_json.workspace = true

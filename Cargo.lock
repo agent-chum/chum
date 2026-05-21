@@ -207,6 +207,7 @@ dependencies = [
  "chum-core",
  "chum-install",
  "chum-registry",
+ "clap",
  "nix",
  "serde",
  "serde_json",
