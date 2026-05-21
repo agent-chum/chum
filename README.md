@@ -29,35 +29,49 @@ One CLI, one launchd-managed daemon, one local SQLite registry. Every MCP server
 
 ## Quick start (v0.0.x developer build)
 
-`install`, `list`, and `uninstall` are wired end-to-end against the local registry before the daemon ships. The full lifecycle works today:
+The repo ships 10 first-party MCP server manifests under `manifests/`. Pick one, edit any path/key placeholders, install it.
 
 ```sh
-# One-time: create the directory the runnable example points at.
-./scripts/setup-test-fixture.sh
+# Step 1 — edit `manifests/chum-filesystem.toml` so `runtime.args[2]`
+# points at a real directory on your machine. The default is
+# `/Users/CHANGE_ME/Documents` — an unedited install will fail loudly
+# rather than silently bind to that placeholder.
+$EDITOR manifests/chum-filesystem.toml
 
-# Install. Defaults to $CHUM_HOME, then $XDG_DATA_HOME/chum, then $HOME/.chum;
-# pass --root to override for this invocation.
-cargo run --bin chum -- install \
-    crates/chum-cli/tests/fixtures/chum-local-runnable.toml \
-    --root /tmp/chum-demo
+# Step 2 — install. Defaults to $CHUM_HOME, then $XDG_DATA_HOME/chum,
+# then $HOME/.chum; pass --root to override for this invocation.
+cargo run --bin chum -- install manifests/chum-filesystem.toml --root /tmp/chum-demo
 
-# List installed packages. Optional name-prefix filter; --json for scripts.
+# Step 3 — start the daemon (chumd) and the server.
+cargo run --bin chumd -- --root /tmp/chum-demo &
+cargo run --bin chum -- start filesystem --root /tmp/chum-demo
+
+# Step 4 — verify everything is running.
 cargo run --bin chum -- list --root /tmp/chum-demo
-cargo run --bin chum -- list chum- --root /tmp/chum-demo --json
+cargo run --bin chum -- status filesystem --root /tmp/chum-demo
+cargo run --bin chum -- daemon ping --root /tmp/chum-demo
 
-# Uninstall. Positional or --version both work; --force skips the y/N prompt
-# (also skipped automatically when stdin is not a tty or --json is set).
-cargo run --bin chum -- uninstall chum-local-runnable --root /tmp/chum-demo --force
-
-# Dry-run an install to confirm parse + validate without writing:
-cargo run --bin chum -- install <path-to-manifest.toml> --dry-run
+# Step 5 — stop + uninstall when you're done.
+cargo run --bin chum -- stop filesystem --root /tmp/chum-demo
+cargo run --bin chum -- uninstall filesystem --root /tmp/chum-demo --force
 
 # Machine-readable JSON for scripting (every command supports it):
-cargo run --bin chum -- install <path-to-manifest.toml> --json
-cargo run --bin chum -- uninstall foo --keep-files --json   # registry-only delete
+cargo run --bin chum -- list --root /tmp/chum-demo --json
+cargo run --bin chum -- status filesystem --root /tmp/chum-demo --json
 ```
 
-All three commands compose the same three lower-level crates: `chum-core` parses + validates the manifest, `chum-install` does the filesystem work (symlink for local, fetch + checksum + extract for binary, subprocess for npm), and `chum-registry` persists or reads the row. The daemon will own this composition once it ships in v0.1 — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the boundary.
+Other manifests under `manifests/` (`brave-search`, `slack`, `github`, `postgres`, `puppeteer`, `memory`, `sequential-thinking`, `redis`, `everything`) follow the same pattern. Each manifest's header comment documents what to edit before install (API keys, connection strings, allowed paths). The `chum-everything.toml` reference server needs zero configuration and is the recommended end-to-end smoke target.
+
+#### Local-fixture alternative (no npm required)
+
+If you want to exercise the install / start / stop / status loop without npm or the network, the repo also ships a self-contained Source::Local fixture:
+
+```sh
+./scripts/setup-test-fixture.sh
+cargo run --bin chum -- install crates/chum-cli/tests/fixtures/chum-local-runnable.toml --root /tmp/chum-demo-local
+```
+
+The cli composes three lower-level crates: `chum-core` parses + validates the manifest, `chum-install` does the filesystem work (symlink for local, fetch + checksum + extract for binary, subprocess for npm), and `chum-registry` persists the row. The daemon (`chumd`) owns process supervision and IPC. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the boundary.
 
 ### Talking to the daemon
 
