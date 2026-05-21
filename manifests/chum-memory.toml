@@ -52,3 +52,10 @@ tools = [
 ]
 resources = []
 prompts = []
+
+# Permissions the user must grant after install (via `chum permit`).
+# The memory server reads + writes its knowledge-graph JSON file
+# inside its install_dir. If you set MEMORY_FILE_PATH, also grant
+# read/write of that absolute path.
+[permissions.env]
+read = ["MEMORY_FILE_PATH"]

@@ -48,3 +48,9 @@ kind = "process"
 tools = ["set", "get", "delete", "list"]
 resources = []
 prompts = []
+
+# Permissions the user must grant after install (via `chum permit`).
+# The host below must match the host portion of `runtime.args[2]`'s
+# Redis URL. Update both together.
+[permissions.network]
+outbound = ["localhost"]

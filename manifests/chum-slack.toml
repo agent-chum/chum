@@ -53,3 +53,9 @@ tools = [
 ]
 resources = []
 prompts = []
+
+# Permissions the user must grant after install (via `chum permit`).
+[permissions.network]
+outbound = ["slack.com"]
+[permissions.env]
+read = ["SLACK_BOT_TOKEN", "SLACK_TEAM_ID"]

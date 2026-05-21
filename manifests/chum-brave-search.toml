@@ -45,3 +45,9 @@ kind = "process"
 tools = ["brave_web_search", "brave_local_search"]
 resources = []
 prompts = []
+
+# Permissions the user must grant after install (via `chum permit`).
+[permissions.network]
+outbound = ["api.search.brave.com"]
+[permissions.env]
+read = ["BRAVE_API_KEY"]

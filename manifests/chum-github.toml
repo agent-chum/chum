@@ -68,3 +68,9 @@ tools = [
 ]
 resources = []
 prompts = []
+
+# Permissions the user must grant after install (via `chum permit`).
+[permissions.network]
+outbound = ["api.github.com"]
+[permissions.env]
+read = ["GITHUB_PERSONAL_ACCESS_TOKEN"]

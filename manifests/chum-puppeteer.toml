@@ -49,3 +49,20 @@ tools = [
 ]
 resources = []
 prompts = []
+
+# v0.1 broker gap: puppeteer needs broad network access (any host
+# any user might browse) plus subprocess execution of its bundled
+# Chromium binary. v0.1 broker is exact-string match only —
+# `network.outbound = ["*"]` won't be honored, and listing every
+# possible domain isn't viable.
+#
+# Decision: leave `[permissions]` empty in v0.1. The manifest
+# declares no requirements, so the broker auto-allows (same path
+# as pre-broker installs). v0.2 introduces wildcard matching
+# (`*.googleapis.com`, etc.) and a `subprocess.exec` grant for
+# Chromium, at which point this manifest grows a real
+# `[permissions]` block.
+#
+# Until then, puppeteer is the one first-party manifest that
+# escapes broker bookkeeping by design. Documented in
+# `docs/BROKER_DESIGN.md` §9.

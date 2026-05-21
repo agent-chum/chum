@@ -59,3 +59,10 @@ tools = [
 ]
 resources = []
 prompts = []
+
+# Permissions the user must grant after install (via `chum permit`).
+# Keep these in sync with `runtime.args[2]` — when you edit the path
+# above, edit the matching grants here.
+[permissions.filesystem]
+read  = ["/Users/CHANGE_ME/Documents"]
+write = ["/Users/CHANGE_ME/Documents"]
