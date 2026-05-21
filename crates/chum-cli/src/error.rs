@@ -272,6 +272,95 @@ impl UserFacingError {
         }
     }
 
+    /// Recovery hint for this error, or `None` when the existing
+    /// [`Self::message`] is already actionable enough.
+    ///
+    /// Rendered as a `hint: <text>` line below the error message in
+    /// human mode. Carried as a `"hint"` field in the `--json`
+    /// envelope (omitted when `None`).
+    pub fn recovery_hint(&self) -> Option<&'static str> {
+        match self {
+            UserFacingError::ManifestIo { .. } => {
+                Some("check the path; you can list available manifests with: chum search")
+            }
+            UserFacingError::Manifest(ManifestError::Toml(_)) => {
+                Some("fix the TOML syntax error and re-run chum install")
+            }
+            UserFacingError::Manifest(ManifestError::TomlSerialize(_)) => {
+                Some("likely a chum bug — please file an issue")
+            }
+            UserFacingError::Install(InstallError::FetchFailed { .. }) => {
+                Some("check the URL or your network connection")
+            }
+            UserFacingError::Install(InstallError::ChecksumMismatch { .. }) => {
+                Some("the binary may have been tampered with — verify the manifest's checksum_sha256")
+            }
+            UserFacingError::Install(InstallError::SubprocessFailed { .. }) => {
+                Some("check the subprocess's stderr above for the underlying error")
+            }
+            UserFacingError::Install(InstallError::ExtractFailed(_)) => {
+                Some("the archive may be corrupted — re-download or verify the URL")
+            }
+            UserFacingError::Install(InstallError::UnsupportedSource(_)) => {
+                Some("only npm / local / binary are supported in v0.1; pypi / github land in v0.2+")
+            }
+            UserFacingError::Install(InstallError::Io(_)) => {
+                Some("check filesystem permissions on the install root")
+            }
+            UserFacingError::Install(InstallError::ManifestSerialize(_)) => {
+                Some("likely a chum bug — please file an issue")
+            }
+            UserFacingError::Registry(RegistryError::SqlError(_)) => {
+                Some("check that state.db is readable; try: chum doctor")
+            }
+            UserFacingError::Registry(RegistryError::MigrationFailed { .. }) => {
+                Some("your state.db may be from a future chum version — back it up and retry")
+            }
+            UserFacingError::Registry(RegistryError::NotFound { .. }) => {
+                Some("likely a chum bug — please file an issue")
+            }
+            UserFacingError::Registry(RegistryError::Io(_)) => {
+                Some("check filesystem permissions on <chum_home>/state.db")
+            }
+            UserFacingError::RootIo { .. } => {
+                Some("check filesystem permissions on the root path")
+            }
+            UserFacingError::RemoveFailed { .. } => {
+                Some("check filesystem permissions on the package directory")
+            }
+            UserFacingError::NotInstalled { .. } => {
+                Some("install with: chum install <manifest>")
+            }
+            UserFacingError::DaemonUnreachable { .. } => {
+                Some("start chumd with: chumd & (or: chum daemon install-service for auto-start)")
+            }
+            UserFacingError::DaemonProtocol { .. } => {
+                Some("likely a chum bug — please file an issue with the daemon's stderr")
+            }
+            UserFacingError::ProcessNotInstalled { .. } => {
+                Some("install with: chum install <manifest>")
+            }
+            UserFacingError::ProcessNotRunning { .. } => {
+                Some("start with: chum start <name>")
+            }
+            UserFacingError::ServiceCommandFailed { .. } => {
+                Some("check the launchctl output above; common cause: chumd binary moved")
+            }
+            UserFacingError::GrantNotFound { .. } => {
+                Some("run 'chum permissions <name>' to see all grants")
+            }
+            UserFacingError::EnvKeyInvalid { .. } => {
+                Some("keys must match [A-Za-z_][A-Za-z0-9_]* (POSIX shape)")
+            }
+            UserFacingError::EnvUpdateFailed { .. } => {
+                Some("check filesystem permissions on the manifest file")
+            }
+            // Variants whose `message()` already embeds the recovery
+            // action don't need a second line.
+            _ => None,
+        }
+    }
+
     /// Human-readable message for this error.
     pub fn message(&self) -> String {
         match self {
@@ -451,21 +540,44 @@ impl UserFacingError {
 
 /// Render an error to the appropriate stream.
 ///
-/// - **Human mode** (`json = false`): one-line `error: <message>` on
-///   stderr. The process exits with code 1 from `main`.
-/// - **JSON mode** (`json = true`): a single-object envelope on
-///   stdout with shape `{ "status": "error", "code": "...",
-///   "message": "..." }`. Script callers can parse one stream and
-///   check exit code.
+/// Thin wrapper around [`render_actionable_error`]. Kept for source-
+/// level backwards compat with earlier sessions' call sites; new code
+/// should call `render_actionable_error` directly.
 pub fn render(err: &UserFacingError, json: bool) {
+    render_actionable_error(err, json);
+}
+
+/// Render an error with its recovery hint (when one exists) to the
+/// appropriate stream.
+///
+/// - **Human mode** (`json = false`): two-line stderr output:
+///   ```
+///   error: <message>
+///   hint:  <recovery hint>
+///   ```
+///   The `hint:` line is omitted when [`UserFacingError::recovery_hint`]
+///   returns `None`. The process exits with code 1 from `main`.
+///
+/// - **JSON mode** (`json = true`): a single-object envelope on
+///   stdout: `{ "status": "error", "code": "...", "message": "...",
+///   "hint": "..." }`. The `"hint"` field is omitted when there's no
+///   recovery hint.
+pub fn render_actionable_error(err: &UserFacingError, json: bool) {
+    let hint = err.recovery_hint();
     if json {
-        let envelope = serde_json::json!({
+        let mut envelope = serde_json::json!({
             "status": "error",
             "code": err.code(),
             "message": err.message(),
         });
+        if let Some(h) = hint {
+            envelope["hint"] = serde_json::Value::String(h.to_string());
+        }
         println!("{envelope}");
     } else {
         eprintln!("error: {}", err.message());
+        if let Some(h) = hint {
+            eprintln!("hint:  {h}");
+        }
     }
 }
