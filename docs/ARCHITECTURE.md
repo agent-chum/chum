@@ -85,32 +85,47 @@ chum-daemon spawns the server at artifact.entrypoint
 
 ## CLI composition (v0.1 stopgap)
 
-Until the daemon protocol ships, `chum-cli` composes the three lower-level crates directly inside `crates/chum-cli/src/commands/install.rs`. Once `chum-daemon` exists, the cli sends an `Install` request over its protocol surface and the same orchestration moves behind it. The pipeline shape does not change — only the boundary moves.
+Until the daemon protocol ships, `chum-cli` composes the three lower-level crates directly inside `crates/chum-cli/src/commands/`. Once `chum-daemon` exists, every subcommand sends a request over its protocol surface and the same orchestration moves behind it. The pipeline shape does not change — only the boundary moves.
 
 ```
-chum install <manifest>
-   │
-   ▼
-chum-core::parse_and_validate     ── pure parse + validation
-   │
-   ▼
-chum-install::install             ── ACTS: symlink / fetch / extract
-   │   returns InstalledArtifact
-   ▼
-chum-registry::Registry::insert   ── PERSISTS: writes state.db row
-   │
-   ▼
-print confirmation                ── human or `--json` envelope
+chum install <manifest>                     chum list                       chum uninstall <name> [version]
+   │                                         │                                │
+   ▼                                         ▼                                ▼
+chum-core::parse_and_validate                ─── (no chum-core needed)        ─── (no chum-core needed)
+   │                                         │                                │
+   ▼                                         │                                │
+chum-install::install                        │                                │
+   │   returns InstalledArtifact             │                                │
+   ▼                                         ▼                                ▼
+chum-registry::Registry::insert     chum-registry::list_all / list_by_name    chum-registry::get_by_name_version
+   │                                         │                                │
+   │                                         │                                ▼
+   │                                         │                          fs::remove_dir_all (unless --keep-files)
+   │                                         │                                │
+   │                                         │                                ▼
+   │                                         │                          chum-registry::delete
+   ▼                                         ▼                                ▼
+print confirmation                  print table or JSON                print confirmation
 ```
 
 What the cli adds on top of the three crates:
 
-- **Single ErrorRenderer.** `chum_cli::error::UserFacingError` wraps every crate-level error and maps it to a stable `code` string plus a human message. Library types never reach `stderr` directly.
-- **`--dry-run`.** Parse + validate + root resolution only; no filesystem or registry I/O. The resolved root is echoed back so users can confirm a `--root` override took effect.
-- **`--json` envelopes.** Stable contracts for scripting: `{"status":"ok","installed":{...}}` on success, `{"status":"dry-run","manifest":{...},"root":"...","would_install_at":"..."}` on dry-run, `{"status":"error","code":"...","message":"..."}` on any failure. Error codes are part of the contract — see `crates/chum-cli/src/error.rs::UserFacingError::code`.
-- **Duplicate pre-check.** Before calling `chum-install`, the cli asks the registry whether `(name, version)` already exists. This is defense in depth — `UNIQUE(name, version)` in SQL would also reject — but it lets us return `already_installed` (clearer than `registry_duplicate`) and avoid touching the filesystem at all on a re-install.
+- **Single ErrorRenderer.** `chum_cli::error::UserFacingError` wraps every crate-level error and maps it to a stable `code` string plus a human message. Library types never reach `stderr` directly. Codes are part of the `--json` contract — see `crates/chum-cli/src/error.rs::UserFacingError::code`.
+- **Shared `resolve_root` helper.** All three subcommands route `--root` override and `chum_home()` resolution through `commands::resolve_root`, so the `chum_home_unresolved` error path is one piece of code, not three copies.
+- **`--dry-run`** (install only). Parse + validate + root resolution; no filesystem or registry I/O. The resolved root is echoed so users can confirm a `--root` override took effect.
+- **`--json` envelopes.** Stable contracts for scripting:
+  - install ok → `{"status":"ok","installed":{...}}`
+  - install dry-run → `{"status":"dry-run","manifest":{...},"root":"...","would_install_at":"..."}`
+  - list → `{"status":"ok","packages":[...]}`
+  - uninstall ok → `{"status":"ok","uninstalled":{"name":"...","version":"...","keep_files":false}}`
+  - uninstall cancelled (tty + "n") → `{"status":"cancelled","name":"...","version":"..."}`
+  - any error → `{"status":"error","code":"...","message":"..."}`
+- **Duplicate pre-check on install.** Before calling `chum-install`, the cli asks the registry whether `(name, version)` already exists. Defense in depth on top of `UNIQUE(name, version)` in SQL — lets us return `already_installed` (clearer than `registry_duplicate`) and avoid touching the filesystem at all on a re-install.
+- **Registry-driven version resolution on uninstall.** If the caller does not supply a version, `list_by_name(name)` decides: 0 rows → `not_installed`, 1 → that one, 2+ → `ambiguous_version` carrying the list of versions so the message can name them. The cli deliberately does **not** implement an implicit "pick the latest" rule — silent guessing on a destructive operation is the wrong default.
+- **TTY-aware uninstall confirmation.** `std::io::stdin().is_terminal()` (Rust 1.85+, no `atty` / `is-terminal` crate) gates the y/N prompt. Skip rules: `--force` OR `--json` OR not-a-tty.
+- **`list` does not create `state.db`.** A fresh root with no install_artifacts table is treated as an empty list (`No packages installed.`, exit 0). The cli checks `db.is_file()` before calling `Registry::open` so a bare `chum list` on an empty machine doesn't leave a 16-byte SQLite file behind.
 
-`commands/install.rs` carries a `// TODO(chum-v0.x): route through chum-daemon protocol once it lands.` marker at the top. Future contributors should not extend the direct-composition surface — new subcommands wait for the daemon protocol.
+`commands/install.rs`, `commands/list.rs`, and `commands/uninstall.rs` each carry a `// TODO(chum-v0.x): route through chum-daemon protocol once it lands.` marker at the top. Future contributors should not extend the direct-composition surface — new subcommands wait for the daemon protocol.
 
 ## chum-registry storage (v0.1)
 

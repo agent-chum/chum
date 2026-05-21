@@ -29,27 +29,35 @@ One CLI, one launchd-managed daemon, one local SQLite registry. Every MCP server
 
 ## Quick start (v0.0.x developer build)
 
-The `chum install` pipeline is wired end-to-end against a local fixture before the daemon ships. Try it against a Source::Local manifest:
+`install`, `list`, and `uninstall` are wired end-to-end against the local registry before the daemon ships. The full lifecycle works today:
 
 ```sh
 # One-time: create the directory the runnable example points at.
 ./scripts/setup-test-fixture.sh
 
-# Build + run the CLI against the runnable fixture.
-cargo run --bin chum -- install crates/chum-cli/tests/fixtures/chum-local-runnable.toml
+# Install. Defaults to $CHUM_HOME, then $XDG_DATA_HOME/chum, then $HOME/.chum;
+# pass --root to override for this invocation.
+cargo run --bin chum -- install \
+    crates/chum-cli/tests/fixtures/chum-local-runnable.toml \
+    --root /tmp/chum-demo
 
-# Or specify your own root for the install (defaults to $CHUM_HOME, then
-# $XDG_DATA_HOME/chum, then $HOME/.chum):
-cargo run --bin chum -- install <path-to-manifest.toml> --root /tmp/chum-demo
+# List installed packages. Optional name-prefix filter; --json for scripts.
+cargo run --bin chum -- list --root /tmp/chum-demo
+cargo run --bin chum -- list chum- --root /tmp/chum-demo --json
 
-# Dry-run any manifest to confirm parse + validate without writing:
+# Uninstall. Positional or --version both work; --force skips the y/N prompt
+# (also skipped automatically when stdin is not a tty or --json is set).
+cargo run --bin chum -- uninstall chum-local-runnable --root /tmp/chum-demo --force
+
+# Dry-run an install to confirm parse + validate without writing:
 cargo run --bin chum -- install <path-to-manifest.toml> --dry-run
 
-# Machine-readable JSON for scripting:
+# Machine-readable JSON for scripting (every command supports it):
 cargo run --bin chum -- install <path-to-manifest.toml> --json
+cargo run --bin chum -- uninstall foo --keep-files --json   # registry-only delete
 ```
 
-`chum install` composes the three lower-level crates (`chum-core` parses the manifest, `chum-install` symlinks / fetches / extracts, `chum-registry` persists the row). The daemon will own this composition in v0.1; see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the boundary.
+All three commands compose the same three lower-level crates: `chum-core` parses + validates the manifest, `chum-install` does the filesystem work (symlink for local, fetch + checksum + extract for binary, subprocess for npm), and `chum-registry` persists or reads the row. The daemon will own this composition once it ships in v0.1 — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the boundary.
 
 ## Status
 
