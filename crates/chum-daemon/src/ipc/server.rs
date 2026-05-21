@@ -254,14 +254,22 @@ async fn verb_spawn(state: &Arc<DaemonState>, args: serde_json::Value) -> Respon
         Err(e) => return Response::error(codes::INVALID_REQUEST, format!("args: {e}")),
     };
 
-    let artifact = match resolve_artifact(state, &parsed.name, &parsed.version) {
-        Ok(a) => a,
-        Err(resp) => return resp,
-    };
+    let (artifact, artifact_id) =
+        match resolve_artifact_with_id(state, &parsed.name, &parsed.version) {
+            Ok(a) => a,
+            Err(resp) => return resp,
+        };
     let manifest = match read_manifest(&artifact.install_dir) {
         Ok(m) => m,
         Err(resp) => return resp,
     };
+
+    // Broker check: required permissions must be covered by grants.
+    if let Err(resp) =
+        check_broker(state, artifact_id, &manifest.permissions, &parsed.name, &parsed.version)
+    {
+        return resp;
+    }
 
     let key = ProcessKey::new(parsed.name.clone(), parsed.version.clone());
     let handle = match state.supervisor.spawn(artifact, manifest).await {
@@ -546,6 +554,16 @@ fn resolve_artifact(
     name: &str,
     version: &str,
 ) -> Result<chum_install::InstalledArtifact, Response> {
+    resolve_artifact_with_id(state, name, version).map(|(art, _id)| art)
+}
+
+/// Same as [`resolve_artifact`] but also returns the registry's
+/// `id` for the row — the broker needs it to look up grants.
+fn resolve_artifact_with_id(
+    state: &Arc<DaemonState>,
+    name: &str,
+    version: &str,
+) -> Result<(chum_install::InstalledArtifact, i64), Response> {
     let db = state.root.join("state.db");
     if !db.is_file() {
         return Err(Response::error(
@@ -557,12 +575,52 @@ fn resolve_artifact(
         Response::error(codes::INTERNAL, format!("registry open failed: {e}"))
     })?;
     match registry.get_by_name_version(name, version) {
-        Ok(row) => Ok(row.into()),
+        Ok(row) => {
+            let id = row.id;
+            Ok((row.into(), id))
+        }
         Err(chum_registry::RegistryError::NotFound { .. }) => Err(Response::error(
             codes::PROCESS_NOT_INSTALLED,
             format!("'{name}' {version} is not installed"),
         )),
         Err(e) => Err(Response::error(codes::INTERNAL, e.to_string())),
+    }
+}
+
+/// Run `chum_broker::validate` against the artifact's grants.
+///
+/// `Allow` → `Ok(())`. `Deny` → returns a `permission_denied`
+/// response listing every unmet requirement with the
+/// `chum permit --grant <kind>=<value>` shape the cli expects.
+fn check_broker(
+    state: &Arc<DaemonState>,
+    artifact_id: i64,
+    required: &chum_core::Permissions,
+    name: &str,
+    version: &str,
+) -> Result<(), Response> {
+    let db = state.root.join("state.db");
+    let registry = chum_registry::Registry::open(&db).map_err(|e| {
+        Response::error(codes::INTERNAL, format!("registry open failed: {e}"))
+    })?;
+    let grants = registry.list_grants(artifact_id).map_err(|e| {
+        Response::error(codes::INTERNAL, format!("list_grants failed: {e}"))
+    })?;
+    match chum_broker::validate(required, &grants) {
+        chum_broker::BrokerVerdict::Allow => Ok(()),
+        chum_broker::BrokerVerdict::Deny { unmet } => {
+            let list = unmet
+                .iter()
+                .map(|r| format!("{}={}", r.kind, r.value))
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(Response::error(
+                codes::PERMISSION_DENIED,
+                format!(
+                    "'{name}' {version} requires grants not yet given: {list}. Run: chum permit {name} --grant <kind>=<value>"
+                ),
+            ))
+        }
     }
 }
 

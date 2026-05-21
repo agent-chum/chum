@@ -92,6 +92,12 @@ pub mod codes {
     /// The package is installed but has no log files yet — start it
     /// (`chum start <name>`) and re-try.
     pub const LOGS_UNAVAILABLE: &str = "logs_unavailable";
+
+    // ----- Broker -----
+    /// `spawn` refused because the manifest declares permissions the
+    /// user has not granted. The cli renders the unmet requirements
+    /// as one `chum permit --grant <kind>=<value>` line per item.
+    pub const PERMISSION_DENIED: &str = "permission_denied";
 }
 
 /// A request from a client to the daemon.

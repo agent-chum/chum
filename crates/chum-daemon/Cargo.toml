@@ -14,6 +14,7 @@ path = "src/bin/chumd.rs"
 
 [dependencies]
 chrono.workspace = true
+chum-broker = { path = "../chum-broker" }
 chum-core.workspace = true
 chum-install.workspace = true
 chum-registry.workspace = true

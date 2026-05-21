@@ -592,3 +592,125 @@ async fn logs_missing_returns_specific_error() {
 
     chumd.sigterm_and_wait().await;
 }
+
+#[tokio::test]
+async fn spawn_with_unmet_permission_returns_permission_denied() {
+    let tmp = TempDir::new().unwrap();
+    let chum_root = tmp.path().to_path_buf();
+    let install_dir = chum_root
+        .join("packages")
+        .join("broker-test")
+        .join("0.1.0");
+    std::fs::create_dir_all(&install_dir).unwrap();
+    std::fs::create_dir_all(install_dir.join("logs")).unwrap();
+
+    let fake_mcp = fake_mcp_path();
+    let symlink = install_dir.join("local-src");
+    std::os::unix::fs::symlink(&fake_mcp, &symlink).unwrap();
+
+    // Manifest declares a permission the user has not granted.
+    let manifest = format!(
+        r#"schema_version = "0.1"
+
+[package]
+name = "broker-test"
+version = "0.1.0"
+description = "broker integration test fixture"
+license = "MIT"
+authors = []
+
+[source]
+kind = "local"
+path = "{fake_mcp}"
+
+[runtime]
+command = "{fake_mcp}"
+args = ["--exit-after-secs", "30"]
+
+[runtime.transport]
+kind = "stdio"
+
+[lifecycle]
+restart = "never"
+
+[permissions.env]
+read = ["BROKER_TEST_KEY"]
+"#,
+        fake_mcp = fake_mcp.display(),
+    );
+    std::fs::write(install_dir.join("chum-manifest.toml"), &manifest).unwrap();
+
+    let registry = Registry::open(chum_root.join("state.db")).unwrap();
+    let artifact_id = registry
+        .insert(&InstalledArtifact {
+            name: "broker-test".to_string(),
+            version: "0.1.0".to_string(),
+            install_dir: install_dir.clone(),
+            entrypoint: symlink,
+            source_kind: SourceKind::Local,
+        })
+        .unwrap();
+
+    let chumd = Chumd::spawn_at(&chum_root).await;
+    let client = chumd.client();
+
+    // First spawn: no grants yet → permission_denied with the unmet
+    // requirement spelled out.
+    let err = client
+        .spawn_process("broker-test", "0.1.0")
+        .await
+        .expect_err("spawn must fail without grant");
+    match err {
+        chum_daemon::IpcError::ServerError { code, message } => {
+            assert_eq!(code, chum_daemon::codes::PERMISSION_DENIED);
+            assert!(
+                message.contains("env.read=BROKER_TEST_KEY"),
+                "message should name the unmet requirement: {message}"
+            );
+            assert!(
+                message.contains("chum permit"),
+                "message should hint at chum permit: {message}"
+            );
+        }
+        other => panic!("expected permission_denied, got {other:?}"),
+    }
+
+    // Issue the grant out-of-band (the cli's chum permit would do this).
+    registry
+        .grant(artifact_id, "env.read", "BROKER_TEST_KEY")
+        .unwrap();
+
+    // Now spawn succeeds.
+    let spawned = client
+        .spawn_process("broker-test", "0.1.0")
+        .await
+        .expect("spawn must succeed after grant");
+    assert!(spawned.pid > 0);
+
+    let _ = client.terminate_process("broker-test", "0.1.0", None).await;
+    chumd.sigterm_and_wait().await;
+}
+
+#[tokio::test]
+async fn spawn_with_empty_permissions_passes_broker() {
+    // Default-empty Permissions (manifest has no [permissions] block)
+    // — broker auto-allows. The existing install_start_status_stop_cycle
+    // already exercises this implicitly, but a focused test makes the
+    // "pre-broker manifests still work" invariant bisectable.
+    let fixture = InstalledFixture::new(
+        "broker-allow",
+        "0.1.0",
+        &["--exit-after-secs", "30"],
+    );
+    let chumd = Chumd::spawn_at(&fixture.chum_root).await;
+    let client = chumd.client();
+
+    let spawned = client
+        .spawn_process(&fixture.name, &fixture.version)
+        .await
+        .expect("spawn with empty permissions must succeed");
+    assert!(spawned.pid > 0);
+
+    let _ = client.terminate_process(&fixture.name, &fixture.version, None).await;
+    chumd.sigterm_and_wait().await;
+}
