@@ -44,3 +44,20 @@ impl From<RegistryArtifact> for InstalledArtifact {
         }
     }
 }
+
+/// One row from `permission_grants`. Represents a single
+/// (artifact, kind, value) triple the user has granted via
+/// `chum permit`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Grant {
+    /// Stable wire-code string for the permission category +
+    /// operation: `filesystem.read`, `filesystem.write`,
+    /// `network.outbound`, `env.read`, `subprocess.exec`.
+    pub kind: String,
+    /// Free-form value (path / host / env var name / program name).
+    /// Exact-string matched against manifest declarations by the
+    /// broker.
+    pub value: String,
+    /// UTC timestamp the grant was issued.
+    pub granted_at: chrono::DateTime<chrono::Utc>,
+}

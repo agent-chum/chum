@@ -36,4 +36,4 @@ pub use chum_install::chum_home;
 pub use error::RegistryError;
 pub use registry::Registry;
 pub use schema::CURRENT_SCHEMA_VERSION;
-pub use types::RegistryArtifact;
+pub use types::{Grant, RegistryArtifact};

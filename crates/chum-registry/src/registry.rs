@@ -8,7 +8,7 @@ use rusqlite::{Connection, params};
 
 use crate::error::RegistryError;
 use crate::schema;
-use crate::types::RegistryArtifact;
+use crate::types::{Grant, RegistryArtifact};
 
 /// Read/write handle to the CHUM registry SQLite database.
 ///
@@ -181,6 +181,106 @@ impl Registry {
         } else {
             Ok(())
         }
+    }
+
+    /// Grant a permission to the artifact with id `artifact_id`.
+    ///
+    /// `INSERT OR IGNORE` semantics: granting the same (kind, value)
+    /// twice is a no-op (returns the existing row's id), not an
+    /// error. `granted_at` is registry-stamped, same pattern as
+    /// `installed_at`.
+    ///
+    /// # Errors
+    /// - [`RegistryError::SqlError`] for SQLite failures, including
+    ///   the CHECK violation if `kind` is not one of the five known
+    ///   wire codes.
+    pub fn grant(
+        &self,
+        artifact_id: i64,
+        kind: &str,
+        value: &str,
+    ) -> Result<i64, RegistryError> {
+        let granted_at = chrono::Utc::now();
+        let result = self.conn.execute(
+            "INSERT OR IGNORE INTO permission_grants \
+             (artifact_id, kind, value, granted_at) \
+             VALUES (?1, ?2, ?3, ?4)",
+            params![artifact_id, kind, value, granted_at],
+        )?;
+        if result == 0 {
+            // Already existed — return the existing row's id.
+            self.conn
+                .query_row(
+                    "SELECT id FROM permission_grants \
+                     WHERE artifact_id = ?1 AND kind = ?2 AND value = ?3",
+                    params![artifact_id, kind, value],
+                    |row| row.get(0),
+                )
+                .map_err(RegistryError::SqlError)
+        } else {
+            Ok(self.conn.last_insert_rowid())
+        }
+    }
+
+    /// Revoke a grant by (artifact_id, kind, value).
+    ///
+    /// # Errors
+    /// - [`RegistryError::NotFound`] if no matching grant exists.
+    ///   `name` carries the kind, `version` carries the value (the
+    ///   variant's fields are reused — see the cli's `GrantNotFound`
+    ///   for the user-facing wrapper).
+    /// - [`RegistryError::SqlError`] for SQLite failures.
+    pub fn revoke(
+        &self,
+        artifact_id: i64,
+        kind: &str,
+        value: &str,
+    ) -> Result<(), RegistryError> {
+        let affected = self.conn.execute(
+            "DELETE FROM permission_grants \
+             WHERE artifact_id = ?1 AND kind = ?2 AND value = ?3",
+            params![artifact_id, kind, value],
+        )?;
+        if affected == 0 {
+            Err(RegistryError::NotFound {
+                name: kind.to_string(),
+                version: value.to_string(),
+            })
+        } else {
+            Ok(())
+        }
+    }
+
+    /// All grants for `artifact_id`, ordered by `granted_at` ASC.
+    pub fn list_grants(&self, artifact_id: i64) -> Result<Vec<Grant>, RegistryError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT kind, value, granted_at FROM permission_grants \
+             WHERE artifact_id = ?1 ORDER BY granted_at ASC, id ASC",
+        )?;
+        let rows = stmt.query_map(params![artifact_id], |row| {
+            Ok(Grant {
+                kind: row.get(0)?,
+                value: row.get(1)?,
+                granted_at: row.get(2)?,
+            })
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    /// Convenience: look up the artifact by (name, version) and
+    /// return its grants in one call. Returns `NotFound` if no
+    /// artifact row exists.
+    pub fn list_grants_by_name_version(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> Result<Vec<Grant>, RegistryError> {
+        let row = self.get_by_name_version(name, version)?;
+        self.list_grants(row.id)
     }
 }
 

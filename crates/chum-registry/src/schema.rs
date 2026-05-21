@@ -22,14 +22,14 @@ use crate::error::RegistryError;
 /// The schema version this build of `chum-registry` writes and expects.
 ///
 /// Bump in lockstep with adding a new entry to the migrations table.
-pub const CURRENT_SCHEMA_VERSION: i64 = 1;
+pub const CURRENT_SCHEMA_VERSION: i64 = 2;
 
 type Migration = fn(&Transaction<'_>) -> rusqlite::Result<()>;
 
 /// All migrations, in order. Slot `i` migrates the database from
 /// schema version `i` to `i + 1`. Append-only; existing entries are
 /// immutable once shipped.
-const MIGRATIONS: &[Migration] = &[migration_1_initial];
+const MIGRATIONS: &[Migration] = &[migration_1_initial, migration_2_permission_grants];
 
 /// Run all pending migrations against `conn`.
 ///
@@ -118,6 +118,40 @@ fn migration_1_initial(tx: &Transaction<'_>) -> rusqlite::Result<()> {
             installed_at TEXT NOT NULL,
             UNIQUE(name, version)
         )",
+        (),
+    )?;
+    Ok(())
+}
+
+/// Migration 2: create the `permission_grants` table for the v0.1
+/// broker.
+///
+/// `kind` CHECK pins the five v0.1 wire codes; new categories require
+/// a new migration that extends the constraint.
+///
+/// `ON DELETE CASCADE` on the artifact_id FK means uninstalling a
+/// package auto-removes its grants — no orphan rows. Requires
+/// `PRAGMA foreign_keys = ON`, which `Registry::open` already sets.
+fn migration_2_permission_grants(tx: &Transaction<'_>) -> rusqlite::Result<()> {
+    tx.execute(
+        "CREATE TABLE permission_grants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            artifact_id INTEGER NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN (
+                'filesystem.read', 'filesystem.write',
+                'network.outbound',
+                'env.read',
+                'subprocess.exec'
+            )),
+            value TEXT NOT NULL,
+            granted_at TEXT NOT NULL,
+            UNIQUE(artifact_id, kind, value),
+            FOREIGN KEY (artifact_id) REFERENCES installed_artifacts(id) ON DELETE CASCADE
+        )",
+        (),
+    )?;
+    tx.execute(
+        "CREATE INDEX permission_grants_artifact ON permission_grants(artifact_id)",
         (),
     )?;
     Ok(())
