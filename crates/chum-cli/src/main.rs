@@ -46,6 +46,8 @@ enum Command {
     Restart(commands::restart::RestartArgs),
     /// Print the daemon-reported status of an installed MCP server.
     Status(commands::status_process::StatusProcessArgs),
+    /// Tail recent log lines for an installed MCP server.
+    Logs(commands::logs::LogsArgs),
     /// Diagnostic + control operations against the chumd daemon itself.
     Daemon {
         #[command(subcommand)]
@@ -84,6 +86,10 @@ async fn main() {
         Command::Status(args) => {
             let json = args.json;
             (commands::status_process::run(args).await, json)
+        }
+        Command::Logs(args) => {
+            let json = args.json;
+            (commands::logs::run(args).await, json)
         }
         Command::Daemon { sub } => {
             let json = match &sub {

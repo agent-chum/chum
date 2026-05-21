@@ -81,6 +81,17 @@ pub mod codes {
     /// The supervisor's monitor task ended without writing a terminal
     /// status. Should not happen in normal operation.
     pub const MONITOR_WEDGED: &str = "monitor_wedged";
+
+    // ----- tail_logs -----
+    /// `tail_logs` was asked for a stream other than
+    /// `"stdout" | "stderr" | "both"`.
+    pub const LOGS_INVALID_STREAM: &str = "logs_invalid_stream";
+    /// `tail_logs` was asked for more than the daemon's per-call
+    /// line cap (10_000).
+    pub const LOGS_LINES_TOO_LARGE: &str = "logs_lines_too_large";
+    /// The package is installed but has no log files yet — start it
+    /// (`chum start <name>`) and re-try.
+    pub const LOGS_UNAVAILABLE: &str = "logs_unavailable";
 }
 
 /// A request from a client to the daemon.
@@ -273,4 +284,41 @@ pub struct TerminateArgs {
     /// Seconds to wait between SIGTERM and SIGKILL. Defaults to 5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grace_secs: Option<u64>,
+}
+
+/// Args envelope for `tail_logs`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TailLogsArgs {
+    /// Package name.
+    pub name: String,
+    /// Package version.
+    pub version: String,
+    /// Which stream to return: `"stdout"`, `"stderr"`, or `"both"`.
+    /// Defaults to `"both"`.
+    #[serde(default = "default_tail_stream")]
+    pub stream: String,
+    /// Last N lines to return. Defaults to 100. Capped at
+    /// [`super::server::MAX_TAIL_LINES`].
+    #[serde(default = "default_tail_lines")]
+    pub lines: usize,
+}
+
+fn default_tail_stream() -> String {
+    "both".to_string()
+}
+
+fn default_tail_lines() -> usize {
+    100
+}
+
+/// Typed payload for `tail_logs`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TailLogsResponse {
+    /// Echo of the requested stream (`"stdout"`, `"stderr"`, or
+    /// `"both"`).
+    pub stream: String,
+    /// Joined-with-`\n` body. For `stream="both"`, the body is
+    /// `=== stdout.log ===\n<stdout>\n=== stderr.log ===\n<stderr>`
+    /// (each section bounded to the requested line count).
+    pub content: String,
 }

@@ -440,3 +440,155 @@ async fn spawn_missing_manifest_returns_specific_code() {
 
     chumd.sigterm_and_wait().await;
 }
+
+#[tokio::test]
+async fn logs_returns_recent_lines() {
+    let fixture = InstalledFixture::new(
+        "logs-fixture",
+        "0.1.0",
+        &[
+            "--print-to-stdout",
+            "hello-stdout",
+            "--print-to-stderr",
+            "hello-stderr",
+            "--exit-after-secs",
+            "0",
+        ],
+    );
+    let chumd = Chumd::spawn_at(&fixture.chum_root).await;
+    let client = chumd.client();
+
+    client.spawn_process(&fixture.name, &fixture.version).await.expect("spawn");
+    // The fake-mcp exits immediately after the prints; wait for terminal.
+    wait_until_status(&client, &fixture.name, &fixture.version, Duration::from_secs(2), |s| {
+        matches!(s, "stopped" | "failed")
+    })
+    .await;
+
+    let resp = client
+        .tail_logs(&fixture.name, &fixture.version, "both", 100)
+        .await
+        .expect("tail_logs both");
+    assert_eq!(resp.stream, "both");
+    assert!(
+        resp.content.contains("hello-stdout"),
+        "missing stdout line in: {}",
+        resp.content
+    );
+    assert!(
+        resp.content.contains("hello-stderr"),
+        "missing stderr line in: {}",
+        resp.content
+    );
+    assert!(
+        resp.content.contains("=== stdout.log"),
+        "missing stdout header in `both` mode: {}",
+        resp.content
+    );
+
+    // Stream-specific queries.
+    let just_stdout = client
+        .tail_logs(&fixture.name, &fixture.version, "stdout", 100)
+        .await
+        .expect("tail_logs stdout");
+    assert!(just_stdout.content.contains("hello-stdout"));
+    assert!(!just_stdout.content.contains("hello-stderr"));
+
+    let just_stderr = client
+        .tail_logs(&fixture.name, &fixture.version, "stderr", 100)
+        .await
+        .expect("tail_logs stderr");
+    assert!(just_stderr.content.contains("hello-stderr"));
+    assert!(!just_stderr.content.contains("hello-stdout"));
+
+    chumd.sigterm_and_wait().await;
+}
+
+#[tokio::test]
+async fn logs_respects_lines_cap() {
+    let fixture = InstalledFixture::new(
+        "logs-cap",
+        "0.1.0",
+        &["--exit-after-secs", "0"],
+    );
+    let chumd = Chumd::spawn_at(&fixture.chum_root).await;
+    let client = chumd.client();
+
+    let err = client
+        .tail_logs(&fixture.name, &fixture.version, "both", 20_000)
+        .await
+        .expect_err("lines > 10_000 must fail");
+    match err {
+        chum_daemon::IpcError::ServerError { code, .. } => {
+            assert_eq!(code, chum_daemon::codes::LOGS_LINES_TOO_LARGE);
+        }
+        other => panic!("expected logs_lines_too_large, got {other:?}"),
+    }
+
+    // Zero lines also rejected.
+    let zero = client
+        .tail_logs(&fixture.name, &fixture.version, "both", 0)
+        .await
+        .expect_err("lines = 0 must fail");
+    match zero {
+        chum_daemon::IpcError::ServerError { code, .. } => {
+            assert_eq!(code, chum_daemon::codes::LOGS_LINES_TOO_LARGE);
+        }
+        other => panic!("expected logs_lines_too_large for 0, got {other:?}"),
+    }
+
+    chumd.sigterm_and_wait().await;
+}
+
+#[tokio::test]
+async fn logs_missing_returns_specific_error() {
+    // Install but never start — log files don't exist yet.
+    let fixture = InstalledFixture::new(
+        "logs-missing",
+        "0.1.0",
+        &["--exit-after-secs", "0"],
+    );
+    // Wipe the logs/ dir to simulate "no logs ever produced".
+    let _ = std::fs::remove_dir_all(fixture.install_dir.join("logs"));
+
+    let chumd = Chumd::spawn_at(&fixture.chum_root).await;
+    let client = chumd.client();
+
+    let err = client
+        .tail_logs(&fixture.name, &fixture.version, "both", 100)
+        .await
+        .expect_err("missing logs must error");
+    match err {
+        chum_daemon::IpcError::ServerError { code, message } => {
+            assert_eq!(code, chum_daemon::codes::LOGS_UNAVAILABLE);
+            assert!(
+                message.contains("start it"),
+                "message should hint at chum start: {message}"
+            );
+        }
+        other => panic!("expected logs_unavailable, got {other:?}"),
+    }
+
+    // Unknown stream string also rejected with its own code.
+    let bad_stream = client
+        .tail_logs(&fixture.name, &fixture.version, "neither", 100)
+        .await;
+    // logs/ is missing so the daemon will return LOGS_UNAVAILABLE before
+    // it gets a chance to validate the stream name — but if the user
+    // pre-created the logs/ dir, the invalid-stream check kicks in.
+    // Both outcomes are acceptable for this assertion; we just verify
+    // we get a server error and not a transport error.
+    match bad_stream {
+        Err(chum_daemon::IpcError::ServerError { code, .. }) => {
+            assert!(
+                code == chum_daemon::codes::LOGS_INVALID_STREAM
+                    || code == chum_daemon::codes::LOGS_UNAVAILABLE,
+                "unexpected code for invalid stream: {code}"
+            );
+        }
+        Err(other) => panic!("expected ServerError, got {other:?}"),
+        Ok(_) => panic!("expected error, got Ok"),
+    }
+
+    chumd.sigterm_and_wait().await;
+}

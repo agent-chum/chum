@@ -15,8 +15,8 @@ use tokio::net::UnixStream;
 use crate::error::IpcError;
 use crate::ipc::{
     ListProcessesResponse, PROTOCOL_VERSION, PingResponse, ProcessKeyArgs, ProcessStatusResponse,
-    Request, Response, RestartProcessResponse, SpawnResponse, StatusResponse, TerminateArgs,
-    TerminateResponse,
+    Request, Response, RestartProcessResponse, SpawnResponse, StatusResponse, TailLogsArgs,
+    TailLogsResponse, TerminateArgs, TerminateResponse,
 };
 
 /// One-request-per-connection client for the daemon's IPC socket.
@@ -178,6 +178,30 @@ impl DaemonClient {
         let req = Request {
             protocol_version: PROTOCOL_VERSION,
             verb: "process_status".to_string(),
+            args: serde_json::to_value(args)?,
+        };
+        self.decode_ok(self.request(&req).await?)
+    }
+
+    /// Send a `tail_logs` verb. `stream` is one of `"stdout"`,
+    /// `"stderr"`, `"both"`. `lines` is capped server-side at
+    /// [`crate::ipc::server::MAX_TAIL_LINES`] (10_000).
+    pub async fn tail_logs(
+        &self,
+        name: impl Into<String>,
+        version: impl Into<String>,
+        stream: impl Into<String>,
+        lines: usize,
+    ) -> Result<TailLogsResponse, IpcError> {
+        let args = TailLogsArgs {
+            name: name.into(),
+            version: version.into(),
+            stream: stream.into(),
+            lines,
+        };
+        let req = Request {
+            protocol_version: PROTOCOL_VERSION,
+            verb: "tail_logs".to_string(),
             args: serde_json::to_value(args)?,
         };
         self.decode_ok(self.request(&req).await?)

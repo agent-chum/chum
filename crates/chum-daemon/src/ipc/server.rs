@@ -20,7 +20,8 @@ use tokio::task::JoinSet;
 
 use crate::error::IpcError;
 use crate::ipc::{
-    DAEMON_VERSION, PROTOCOL_VERSION, ProcessKeyArgs, Request, Response, TerminateArgs, codes,
+    DAEMON_VERSION, PROTOCOL_VERSION, ProcessKeyArgs, Request, Response, TailLogsArgs,
+    TerminateArgs, codes,
 };
 use crate::supervisor::{ProcessKey, ProcessStatus, Supervisor};
 
@@ -34,6 +35,11 @@ pub const READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Hard ceiling on draining in-flight handlers during shutdown.
 pub const SHUTDOWN_DRAIN_CEILING: Duration = Duration::from_secs(5);
+
+/// Hard ceiling on how many log lines `tail_logs` will return per
+/// call. Defense in depth — a misbehaving client asking for tens of
+/// millions of lines should fail fast, not OOM the daemon.
+pub const MAX_TAIL_LINES: usize = 10_000;
 
 /// State shared across all handler tasks. Cloned cheaply via `Arc`.
 pub struct DaemonState {
@@ -183,6 +189,7 @@ async fn dispatch_bytes(buf: &[u8], state: &Arc<DaemonState>) -> Response {
         "terminate" => verb_terminate(state, req.args).await,
         "restart" => verb_restart(state, req.args).await,
         "process_status" => verb_process_status(state, req.args).await,
+        "tail_logs" => verb_tail_logs(state, req.args).await,
         other => Response::error(
             codes::UNKNOWN_VERB,
             format!("verb '{other}' is not recognised by this daemon"),
@@ -392,6 +399,134 @@ async fn verb_process_status(state: &Arc<DaemonState>, args: serde_json::Value) 
         data["exit_code"] = serde_json::json!(c);
     }
     Response::ok(data)
+}
+
+async fn verb_tail_logs(state: &Arc<DaemonState>, args: serde_json::Value) -> Response {
+    let parsed: TailLogsArgs = match serde_json::from_value(args) {
+        Ok(p) => p,
+        Err(e) => return Response::error(codes::INVALID_REQUEST, format!("args: {e}")),
+    };
+
+    if parsed.lines == 0 || parsed.lines > MAX_TAIL_LINES {
+        return Response::error(
+            codes::LOGS_LINES_TOO_LARGE,
+            format!(
+                "lines must be in 1..={MAX_TAIL_LINES}, got {}",
+                parsed.lines
+            ),
+        );
+    }
+
+    let artifact = match resolve_artifact(state, &parsed.name, &parsed.version) {
+        Ok(a) => a,
+        Err(resp) => return resp,
+    };
+
+    let logs_dir = artifact.install_dir.join("logs");
+    let stdout_path = logs_dir.join("stdout.log");
+    let stderr_path = logs_dir.join("stderr.log");
+
+    let stdout_exists = stdout_path.is_file();
+    let stderr_exists = stderr_path.is_file();
+
+    let content = match parsed.stream.as_str() {
+        "stdout" => {
+            if !stdout_exists {
+                return Response::error(
+                    codes::LOGS_UNAVAILABLE,
+                    format!(
+                        "no stdout log yet for '{}' {} (start it once to populate logs)",
+                        parsed.name, parsed.version,
+                    ),
+                );
+            }
+            match read_tail(&stdout_path, parsed.lines) {
+                Ok(s) => s,
+                Err(resp) => return resp,
+            }
+        }
+        "stderr" => {
+            if !stderr_exists {
+                return Response::error(
+                    codes::LOGS_UNAVAILABLE,
+                    format!(
+                        "no stderr log yet for '{}' {} (start it once to populate logs)",
+                        parsed.name, parsed.version,
+                    ),
+                );
+            }
+            match read_tail(&stderr_path, parsed.lines) {
+                Ok(s) => s,
+                Err(resp) => return resp,
+            }
+        }
+        "both" => {
+            if !stdout_exists && !stderr_exists {
+                return Response::error(
+                    codes::LOGS_UNAVAILABLE,
+                    format!(
+                        "no logs yet for '{}' {} (start it once to populate logs)",
+                        parsed.name, parsed.version,
+                    ),
+                );
+            }
+            let stdout_body = if stdout_exists {
+                match read_tail(&stdout_path, parsed.lines) {
+                    Ok(s) => s,
+                    Err(resp) => return resp,
+                }
+            } else {
+                String::new()
+            };
+            let stderr_body = if stderr_exists {
+                match read_tail(&stderr_path, parsed.lines) {
+                    Ok(s) => s,
+                    Err(resp) => return resp,
+                }
+            } else {
+                String::new()
+            };
+            format!(
+                "=== stdout.log (last {} lines) ===\n{stdout_body}\n=== stderr.log (last {} lines) ===\n{stderr_body}",
+                parsed.lines, parsed.lines,
+            )
+        }
+        other => {
+            return Response::error(
+                codes::LOGS_INVALID_STREAM,
+                format!(
+                    "stream must be 'stdout', 'stderr', or 'both' (got '{other}')"
+                ),
+            );
+        }
+    };
+
+    Response::ok(serde_json::json!({
+        "stream": parsed.stream,
+        "content": content,
+    }))
+}
+
+/// Read up to `lines` lines from the end of `path`. v0.1 reads the
+/// whole file into memory and slices — fine for the per-process log
+/// file sizes we see today.
+///
+// TODO(chum-v0.2): chunked reverse-read so giant log files don't
+// have to fit in memory. Pair with log rotation when we add it.
+fn read_tail(path: &std::path::Path, lines: usize) -> Result<String, Response> {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(e) => {
+            return Err(Response::error(
+                codes::INTERNAL,
+                format!("read log {}: {e}", path.display()),
+            ));
+        }
+    };
+    let all_lines: Vec<&str> = content.lines().collect();
+    let start = all_lines.len().saturating_sub(lines);
+    Ok(all_lines[start..].join("\n"))
 }
 
 fn status_string_and_exit(s: &ProcessStatus) -> (&'static str, Option<i32>) {

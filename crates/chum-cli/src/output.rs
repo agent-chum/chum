@@ -13,7 +13,7 @@ use std::path::Path;
 use chum_core::Manifest;
 use chum_daemon::{
     PingResponse, ProcessStatusResponse, RestartProcessResponse, SpawnResponse, StatusResponse,
-    TerminateResponse,
+    TailLogsResponse, TerminateResponse,
 };
 use chum_install::{InstalledArtifact, SourceKind};
 use chum_registry::RegistryArtifact;
@@ -205,6 +205,25 @@ pub fn emit_restarted(
             "Restarted {} {} (pid {}, restart_count {})",
             name, version, resp.pid, resp.restart_count,
         );
+    }
+}
+
+/// `chum logs` output. In human mode prints the daemon's `content`
+/// field directly to stdout (no decoration — it's already shaped for
+/// human consumption, including section headers when stream is
+/// `both`). JSON mode wraps the response in a stable envelope.
+pub fn emit_logs(resp: &TailLogsResponse, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "logs": {
+                "stream": resp.stream,
+                "content": resp.content,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!("{}", resp.content);
     }
 }
 

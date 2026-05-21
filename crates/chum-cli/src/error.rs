@@ -129,6 +129,17 @@ pub enum UserFacingError {
         /// install_dir that should have contained the manifest.
         install_dir: PathBuf,
     },
+    /// `chum logs` saw the daemon report `logs_unavailable` — the
+    /// package is installed but has no log files yet. User must
+    /// `chum start` it at least once to populate logs.
+    LogsUnavailable {
+        /// Package name.
+        name: String,
+        /// Package version.
+        version: String,
+        /// install_dir whose `logs/` is empty.
+        install_dir: PathBuf,
+    },
 }
 
 impl UserFacingError {
@@ -194,6 +205,7 @@ impl UserFacingError {
             UserFacingError::ProcessAlreadyRunning { .. } => "process_already_running",
             UserFacingError::ProcessNotRunning { .. } => "process_not_running",
             UserFacingError::ManifestMissing { .. } => "manifest_missing_in_install_dir",
+            UserFacingError::LogsUnavailable { .. } => "logs_unavailable",
         }
     }
 
@@ -328,6 +340,12 @@ impl UserFacingError {
             UserFacingError::ManifestMissing { install_dir } => {
                 format!(
                     "chum-manifest.toml missing at {} (this install predates the v0.1 manifest-copy commit; re-install to repair)",
+                    install_dir.display(),
+                )
+            }
+            UserFacingError::LogsUnavailable { name, version, install_dir } => {
+                format!(
+                    "no logs yet for '{name}' {version} — start it once with 'chum start {name}' to populate {}/logs/",
                     install_dir.display(),
                 )
             }

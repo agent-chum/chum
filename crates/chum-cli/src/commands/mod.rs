@@ -13,6 +13,7 @@ use crate::error::UserFacingError;
 pub mod daemon;
 pub mod install;
 pub mod list;
+pub mod logs;
 pub mod restart;
 pub mod start;
 pub mod status_process;
@@ -174,6 +175,11 @@ pub(crate) fn map_lifecycle_ipc_error(
                     install_dir: target.install_dir.clone(),
                 }
             }
+            chum_daemon::codes::LOGS_UNAVAILABLE => UserFacingError::LogsUnavailable {
+                name: target.name.clone(),
+                version: target.version.clone(),
+                install_dir: target.install_dir.clone(),
+            },
             other => UserFacingError::DaemonProtocol {
                 reason: format!("server error {other}: {message}"),
             },
