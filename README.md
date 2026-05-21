@@ -130,7 +130,24 @@ cargo run --bin chum -- stop <name> --grace 2 --json --root /tmp/chum-demo
 
 When more than one version of `<name>` is installed, lifecycle subcommands require `--version`; otherwise they return `ambiguous_version` listing the installed versions. The same pattern `chum uninstall` uses.
 
-Per-process stdout / stderr land in `<install_dir>/logs/{stdout,stderr}.log`. `chum logs` lands in a later session — today the files are written but the cli doesn't tail them; cat / tail / less work fine.
+Per-process stdout / stderr land in `<install_dir>/logs/{stdout,stderr}.log`. The cli reads them via `chum logs`:
+
+```sh
+# Default: last 100 lines, both streams with section headers.
+cargo run --bin chum -- logs <name> --root /tmp/chum-demo
+
+# Stream-specific:
+cargo run --bin chum -- logs <name> --stdout --root /tmp/chum-demo
+cargo run --bin chum -- logs <name> --stderr --root /tmp/chum-demo
+
+# Last N lines (capped at 10,000 server-side):
+cargo run --bin chum -- logs <name> --lines 500 --root /tmp/chum-demo
+
+# JSON envelope for scripts:
+cargo run --bin chum -- logs <name> --json --root /tmp/chum-demo
+```
+
+`--follow` (live tailing) lands in v0.2 alongside log rotation — today's logs accumulate verbatim across spawns / restarts in the same files.
 
 ## Status
 

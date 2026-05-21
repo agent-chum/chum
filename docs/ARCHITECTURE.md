@@ -225,7 +225,19 @@ The manifest re-parse on every spawn is by design: `chum-install` writes `<insta
 
 #### Logs
 
-Child stdout / stderr are redirected to `<install_dir>/logs/{stdout,stderr}.log` opened with `OpenOptions::create(true).append(true)`. Both internal supervisor restarts (policy-driven) and user-driven restarts re-use the same files, so log files accumulate across the package's lifetime. Log rotation and `chum logs` (tail / follow) ship in a later session — TODO markers in `supervisor/process.rs` point at the streaming-read follow-up.
+Child stdout / stderr are redirected to `<install_dir>/logs/{stdout,stderr}.log` opened with `OpenOptions::create(true).append(true)`. Both internal supervisor restarts (policy-driven) and user-driven restarts re-use the same files, so log files accumulate across the package's lifetime.
+
+The `tail_logs` IPC verb (and `chum logs <name>` cli wrapping it) read the last N lines on demand. Wire shape:
+
+| Verb | `args` | Ok `data` | Stable error codes |
+|---|---|---|---|
+| `tail_logs` | `{name, version, stream: "stdout"\|"stderr"\|"both", lines: N}` | `{stream, content}` | `process_not_installed`, `logs_unavailable`, `logs_invalid_stream`, `logs_lines_too_large` |
+
+Defaults: `stream = "both"`, `lines = 100`. The daemon enforces `1 <= lines <= 10_000`. For `stream == "both"`, the content is `=== stdout.log (last N lines) ===\n<stdout>\n=== stderr.log (last N lines) ===\n<stderr>` — concat with section headers rather than timestamp interleaving (which would require parsing log content, deferred to v0.2).
+
+`logs_unavailable` fires when the package has never been spawned (no log files yet) or the `logs/` directory was hand-removed. The cli renders it with a hint to `chum start <name>` once.
+
+Log rotation and `--follow` / streaming land in v0.2 — both need a long-lived IPC channel and a file-size watermark policy that don't fit the v0.1 surface. TODO markers in `ipc/server.rs::read_tail` point at the chunked reverse-read follow-up for huge log files.
 
 #### Migration: pre-manifest-copy installs
 
