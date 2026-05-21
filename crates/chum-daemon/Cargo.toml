@@ -7,3 +7,14 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+
+[dependencies]
+chrono.workspace = true
+chum-core.workspace = true
+chum-install.workspace = true
+nix.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
