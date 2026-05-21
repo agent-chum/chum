@@ -11,7 +11,10 @@
 use std::path::Path;
 
 use chum_core::Manifest;
-use chum_daemon::{PingResponse, StatusResponse};
+use chum_daemon::{
+    PingResponse, ProcessStatusResponse, RestartProcessResponse, SpawnResponse, StatusResponse,
+    TerminateResponse,
+};
 use chum_install::{InstalledArtifact, SourceKind};
 use chum_registry::RegistryArtifact;
 
@@ -135,6 +138,107 @@ pub fn emit_uninstall_cancelled(target: &RegistryArtifact, json: bool) {
         println!("{envelope}");
     } else {
         println!("Uninstall cancelled.");
+    }
+}
+
+/// `chum start` confirmation. JSON envelope:
+/// `{"status":"ok","started":{"name","version","pid","started_at"}}`.
+pub fn emit_started(name: &str, version: &str, resp: &SpawnResponse, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "started": {
+                "name": name,
+                "version": version,
+                "pid": resp.pid,
+                "started_at": resp.started_at,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!(
+            "Started {} {} (pid {}, at {})",
+            name, version, resp.pid, resp.started_at,
+        );
+    }
+}
+
+/// `chum stop` confirmation. JSON envelope:
+/// `{"status":"ok","stopped":{"name","version"}}`.
+pub fn emit_stopped(name: &str, version: &str, _resp: &TerminateResponse, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "stopped": {
+                "name": name,
+                "version": version,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!("Stopped {} {}", name, version);
+    }
+}
+
+/// `chum restart` confirmation. JSON envelope mirrors `emit_started`
+/// with an added `restart_count`.
+pub fn emit_restarted(
+    name: &str,
+    version: &str,
+    resp: &RestartProcessResponse,
+    json: bool,
+) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "restarted": {
+                "name": name,
+                "version": version,
+                "pid": resp.pid,
+                "started_at": resp.started_at,
+                "restart_count": resp.restart_count,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!(
+            "Restarted {} {} (pid {}, restart_count {})",
+            name, version, resp.pid, resp.restart_count,
+        );
+    }
+}
+
+/// `chum status` output for a single process. JSON envelope:
+/// `{"status":"ok","process":{...}}`.
+pub fn emit_process_status(resp: &ProcessStatusResponse, json: bool) {
+    if json {
+        let mut process = serde_json::json!({
+            "name": resp.name,
+            "version": resp.version,
+            "status": resp.status,
+            "restart_count": resp.restart_count,
+        });
+        if let Some(p) = resp.pid {
+            process["pid"] = serde_json::json!(p);
+        }
+        if let Some(c) = resp.exit_code {
+            process["exit_code"] = serde_json::json!(c);
+        }
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "process": process,
+        });
+        println!("{envelope}");
+    } else {
+        println!("{} {}", resp.name, resp.version);
+        println!("  status:        {}", resp.status);
+        if let Some(p) = resp.pid {
+            println!("  pid:           {p}");
+        }
+        println!("  restart_count: {}", resp.restart_count);
+        if let Some(c) = resp.exit_code {
+            println!("  exit_code:     {c}");
+        }
     }
 }
 

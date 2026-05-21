@@ -27,8 +27,9 @@ struct Cli {
 }
 
 /// Subcommands exposed by the CLI. v0.1 ships `install`, `list`,
-/// `uninstall`, and the `daemon` diagnostic group; more land in
-/// subsequent sessions.
+/// `uninstall`, the process lifecycle group (`start` / `stop` /
+/// `restart` / `status`), and the `daemon` diagnostic group; more
+/// land in subsequent sessions.
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Install an MCP server from a manifest TOML file.
@@ -37,7 +38,15 @@ enum Command {
     List(commands::list::ListArgs),
     /// Remove an installed MCP server's files and registry row.
     Uninstall(commands::uninstall::UninstallArgs),
-    /// Diagnostic + control operations against the chumd daemon.
+    /// Ask the daemon to spawn an installed MCP server.
+    Start(commands::start::StartArgs),
+    /// Ask the daemon to terminate a running MCP server.
+    Stop(commands::stop::StopArgs),
+    /// Ask the daemon to stop and re-spawn a running MCP server.
+    Restart(commands::restart::RestartArgs),
+    /// Print the daemon-reported status of an installed MCP server.
+    Status(commands::status_process::StatusProcessArgs),
+    /// Diagnostic + control operations against the chumd daemon itself.
     Daemon {
         #[command(subcommand)]
         sub: commands::daemon::DaemonSub,
@@ -59,6 +68,22 @@ async fn main() {
         Command::Uninstall(args) => {
             let json = args.json;
             (commands::uninstall::run(args).await, json)
+        }
+        Command::Start(args) => {
+            let json = args.json;
+            (commands::start::run(args).await, json)
+        }
+        Command::Stop(args) => {
+            let json = args.json;
+            (commands::stop::run(args).await, json)
+        }
+        Command::Restart(args) => {
+            let json = args.json;
+            (commands::restart::run(args).await, json)
+        }
+        Command::Status(args) => {
+            let json = args.json;
+            (commands::status_process::run(args).await, json)
         }
         Command::Daemon { sub } => {
             let json = match &sub {

@@ -97,6 +97,38 @@ pub enum UserFacingError {
         /// Free-form description of the failure.
         reason: String,
     },
+    /// A lifecycle subcommand referenced a name that the registry
+    /// doesn't know. `version` is `Some` when the caller supplied
+    /// `--version` or a positional version explicitly; `None` when
+    /// resolution failed before any version was settled.
+    ProcessNotInstalled {
+        /// Package name the caller passed.
+        name: String,
+        /// Version the caller asked for, if any.
+        version: Option<String>,
+    },
+    /// `chum start` saw the daemon report `process_already_running`.
+    ProcessAlreadyRunning {
+        /// Package name.
+        name: String,
+        /// Package version.
+        version: String,
+    },
+    /// `chum stop` / `chum restart` saw the daemon report
+    /// `process_not_running`.
+    ProcessNotRunning {
+        /// Package name.
+        name: String,
+        /// Package version.
+        version: String,
+    },
+    /// The daemon could not find `<install_dir>/chum-manifest.toml`.
+    /// Typically means the row was installed before commit-1 of this
+    /// session landed and the package needs to be re-installed.
+    ManifestMissing {
+        /// install_dir that should have contained the manifest.
+        install_dir: PathBuf,
+    },
 }
 
 impl UserFacingError {
@@ -158,6 +190,10 @@ impl UserFacingError {
             UserFacingError::RemoveFailed { .. } => "remove_failed",
             UserFacingError::DaemonUnreachable { .. } => "daemon_unreachable",
             UserFacingError::DaemonProtocol { .. } => "daemon_protocol_error",
+            UserFacingError::ProcessNotInstalled { .. } => "process_not_installed",
+            UserFacingError::ProcessAlreadyRunning { .. } => "process_already_running",
+            UserFacingError::ProcessNotRunning { .. } => "process_not_running",
+            UserFacingError::ManifestMissing { .. } => "manifest_missing_in_install_dir",
         }
     }
 
@@ -276,6 +312,24 @@ impl UserFacingError {
             }
             UserFacingError::DaemonProtocol { reason } => {
                 format!("daemon protocol error: {reason}")
+            }
+            UserFacingError::ProcessNotInstalled { name, version: Some(v) } => {
+                format!("'{name}' {v} is not installed")
+            }
+            UserFacingError::ProcessNotInstalled { name, version: None } => {
+                format!("'{name}' is not installed")
+            }
+            UserFacingError::ProcessAlreadyRunning { name, version } => {
+                format!("'{name}' {version} is already running (run 'chum stop {name}' first)")
+            }
+            UserFacingError::ProcessNotRunning { name, version } => {
+                format!("'{name}' {version} is not running")
+            }
+            UserFacingError::ManifestMissing { install_dir } => {
+                format!(
+                    "chum-manifest.toml missing at {} (this install predates the v0.1 manifest-copy commit; re-install to repair)",
+                    install_dir.display(),
+                )
             }
         }
     }
