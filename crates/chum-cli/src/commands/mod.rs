@@ -12,6 +12,7 @@ use crate::error::UserFacingError;
 
 pub mod daemon;
 pub mod daemon_service;
+pub mod doctor;
 pub mod env;
 pub mod install;
 pub mod list;

@@ -164,6 +164,16 @@ enum Command {
     ///   chum search --installed-only --json --root /tmp/demo
     Search(commands::search::SearchArgs),
 
+    /// Environment health check: toolchain, npm, CHUM_HOME, chumd, registry.
+    ///
+    /// Always exits 0; failures show as ✗ lines (or status="fail" in
+    /// --json). Scripts branch on the `overall` JSON field.
+    ///
+    /// EXAMPLES:
+    ///   chum doctor
+    ///   chum doctor --json
+    Doctor(commands::doctor::DoctorArgs),
+
     /// Diagnostic + control operations against the chumd daemon itself.
     ///
     /// EXAMPLES:
@@ -237,6 +247,10 @@ async fn main() {
         Command::Search(args) => {
             let json = args.json;
             (commands::search::run(args).await, json)
+        }
+        Command::Doctor(args) => {
+            let json = args.json;
+            (commands::doctor::run(args).await, json)
         }
         Command::Daemon { sub } => {
             let json = match &sub {
