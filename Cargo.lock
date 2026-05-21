@@ -174,13 +174,19 @@ dependencies = [
 
 [[package]]
 name = "chum-broker"
-version = "0.0.1"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chum-core",
+ "chum-registry",
+]
 
 [[package]]
 name = "chum-cli"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chum-broker",
  "chum-core",
  "chum-daemon",
  "chum-install",
@@ -189,11 +195,12 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "toml",
 ]
 
 [[package]]
 name = "chum-core"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "serde",
  "thiserror",
@@ -202,9 +209,10 @@ dependencies = [
 
 [[package]]
 name = "chum-daemon"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "chrono",
+ "chum-broker",
  "chum-core",
  "chum-install",
  "chum-registry",
@@ -219,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "chum-install"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "chum-core",
  "flate2",
@@ -235,7 +243,7 @@ dependencies = [
 
 [[package]]
 name = "chum-registry"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "chrono",
  "chum-install",
