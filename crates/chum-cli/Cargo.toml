@@ -14,4 +14,12 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+chum-core.workspace = true
+chum-install.workspace = true
+chum-registry.workspace = true
 clap.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -181,7 +181,13 @@ name = "chum-cli"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "chum-core",
+ "chum-install",
+ "chum-registry",
  "clap",
+ "serde_json",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

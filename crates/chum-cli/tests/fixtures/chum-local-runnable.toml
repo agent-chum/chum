@@ -1,0 +1,31 @@
+# Runnable example — paired with `scripts/setup-test-fixture.sh`.
+#
+# Run the setup script once to create the directory this manifest
+# points at, then drive the CLI against this file:
+#
+#   ./scripts/setup-test-fixture.sh
+#   cargo run --bin chum -- install crates/chum-cli/tests/fixtures/chum-local-runnable.toml
+#
+# The setup script creates `/tmp/chum-local-test-src/` with a
+# sentinel file so the install crate's existence check passes.
+# `/tmp` is writeable on macOS and Linux CI runners alike.
+
+schema_version = "0.1"
+
+[package]
+name = "chum-local-runnable"
+version = "0.1.0"
+description = "Runnable Source::Local example for hand-driven smoke testing of `chum install`."
+license = "MIT"
+authors = []
+
+[source]
+kind = "local"
+path = "/tmp/chum-local-test-src"
+
+[runtime]
+command = "echo"
+args = ["hello", "from", "chum-local-runnable"]
+
+[runtime.transport]
+kind = "stdio"

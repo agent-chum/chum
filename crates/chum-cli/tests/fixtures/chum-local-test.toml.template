@@ -1,0 +1,32 @@
+# Test-only fixture template. Never executable directly.
+#
+# The `path` value below is a runtime placeholder. The integration
+# test in `tests/install_fixture.rs` reads this file, substitutes
+# `__CHUM_LOCAL_PATH__` with a tempdir-rooted absolute path, and
+# writes the rendered manifest into a fresh tempfile before invoking
+# the `chum` binary against it.
+#
+# A literal `chum install <this-file>` will correctly fail with
+# `install_path_traversal` because `__CHUM_LOCAL_PATH__` is not an
+# absolute filesystem path. For a runnable hand-driven example see
+# `chum-local-runnable.toml` and `scripts/setup-test-fixture.sh`.
+
+schema_version = "0.1"
+
+[package]
+name = "chum-local-test"
+version = "0.1.0"
+description = "Integration test fixture for `chum install` on a Source::Local manifest."
+license = "MIT"
+authors = []
+
+[source]
+kind = "local"
+path = "__CHUM_LOCAL_PATH__"
+
+[runtime]
+command = "echo"
+args = ["hello", "from", "chum-local-test"]
+
+[runtime.transport]
+kind = "stdio"

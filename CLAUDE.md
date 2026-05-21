@@ -33,7 +33,7 @@ This repo is a local-first MCP package manager and capability broker for AI agen
 These are enforced at review time. Violation is a blocker.
 
 - **`chum-core` has no I/O.** Pure types, schemas, and parsing only. No filesystem, network, process, or launchd touches.
-- **`chum-cli` is a thin layer over the chum-daemon protocol.** It never bypasses the daemon to talk to MCP servers or the manifest store directly.
+- **`chum-cli` is a thin layer over the chum-daemon protocol once chum-daemon exists.** It never bypasses the daemon to talk to MCP servers or the manifest store directly. **v0.1 stopgap:** until the daemon protocol lands, `chum-cli` composes `chum-install` + `chum-registry` directly inside `commands/install.rs`; that composition moves behind the daemon when it ships. Do not add new direct-bypass paths beyond what is already there.
 - **`chum-daemon` owns process supervision and state.** All `start` / `stop` / `restart` paths flow through it.
 - **`chum-broker` gates all agent ↔ MCP server access.** No direct passthrough; every capability use is mediated.
 - **`chum-registry` is read-write SQLite.** It never mixes concerns with `chum-broker`.
