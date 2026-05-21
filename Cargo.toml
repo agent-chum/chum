@@ -28,10 +28,13 @@ repository = "https://github.com/agent-chum/chum"
 # references them.
 [workspace.dependencies]
 anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 chum-core = { path = "crates/chum-core" }
+chum-install = { path = "crates/chum-install" }
 clap = { version = "4", features = ["derive"] }
 flate2 = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 tar = "0.4"
