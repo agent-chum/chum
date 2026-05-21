@@ -184,6 +184,53 @@ The `chumd` background daemon exposes a tiny diagnostic surface over a Unix doma
 
 `chum-daemon::DaemonClient` is the canonical client. It exposes a low-level `request(&Request)` for scripts driving the protocol directly plus typed `ping() / status() / list_processes()` methods that decode `data` into typed structs. The cli's `chum daemon ping / status` subcommands wrap it.
 
+### Lifecycle verbs (process supervision)
+
+Past the v0.1 diagnostic verbs, chumd exposes four lifecycle verbs that drive its in-process `Supervisor`. Wire shape:
+
+| Verb | `args` | Ok `data` | Stable error codes |
+|---|---|---|---|
+| `spawn` | `{name, version}` | `{pid, started_at}` | `process_not_installed`, `manifest_missing_in_install_dir`, `manifest_invalid`, `process_already_running`, `spawn_failed` |
+| `terminate` | `{name, version, grace_secs?}` | `{stopped: true}` | `process_not_running`, `kill_failed`, `monitor_wedged` |
+| `restart` | `{name, version}` | `{pid, started_at, restart_count}` | `process_not_running`, `spawn_failed` |
+| `process_status` | `{name, version}` | `{name, version, status, pid?, restart_count, exit_code?}` | `process_not_installed` |
+
+`list_processes` is extended in v0.1 to return the same per-process fields (`name`, `version`, `status`, `pid?`, `restart_count`, `exit_code?`). `restart_count` here is the **user-driven** count maintained by chumd's `DaemonState` — distinct from the supervisor's internal `restart_count` which counts policy-driven respawns. Spawn resets the count to 0; restart increments; terminate removes the entry.
+
+#### Spawn flow
+
+```
+chum start <name> [--version V]
+        │
+        │ resolve_lifecycle_target  (cli — registry lookup + ambiguity check)
+        │
+        ▼
+chumd IPC spawn { name, version }
+        │
+        ▼
+DaemonState::supervisor (chum_daemon::Supervisor)
+        │
+        │ 1. registry.get_by_name_version(name, version)  ── RegistryArtifact
+        │ 2. fs::read_to_string(<install_dir>/chum-manifest.toml)
+        │ 3. chum_core::parse_and_validate
+        │ 4. Supervisor::spawn(InstalledArtifact, Manifest)
+        │ 5. monitor task owns Child, redirects stdout/stderr to
+        │    <install_dir>/logs/{stdout,stderr}.log (append)
+        │
+        ▼
+SpawnResponse { pid, started_at }
+```
+
+The manifest re-parse on every spawn is by design: `chum-install` writes `<install_dir>/chum-manifest.toml` at install time exactly so the supervisor's runtime config (command, args, env, lifecycle policy) is recoverable without keeping in-memory state across daemon restarts. The registry stays narrow — it persists *what is installed*, not *how to run it*.
+
+#### Logs
+
+Child stdout / stderr are redirected to `<install_dir>/logs/{stdout,stderr}.log` opened with `OpenOptions::create(true).append(true)`. Both internal supervisor restarts (policy-driven) and user-driven restarts re-use the same files, so log files accumulate across the package's lifetime. Log rotation and `chum logs` (tail / follow) ship in a later session — TODO markers in `supervisor/process.rs` point at the streaming-read follow-up.
+
+#### Migration: pre-manifest-copy installs
+
+Installs created before `feat(install): copy manifest to install_dir + create logs dir` shipped don't have `chum-manifest.toml` in their install_dir. Calling `chum start` against such a row surfaces `manifest_missing_in_install_dir` from the daemon, which the cli renders as a re-install hint. No automatic migration is attempted — re-installing the package is the supported recovery path.
+
 ## chum-registry storage (v0.1)
 
 ### Schema

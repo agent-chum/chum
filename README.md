@@ -89,6 +89,35 @@ cargo run --bin chum -- daemon ping --socket-path /tmp/alt.sock
 
 `chumd` shuts down cleanly on SIGTERM / SIGINT, removes its socket file on exit, and refuses to start over a live socket (returning `another chumd appears to be running`). Stale socket files left by SIGKILL'd previous runs are auto-recovered. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the wire-protocol spec and the stable error codes.
 
+### Process lifecycle
+
+With chumd running you can drive the full install → start → status → stop loop:
+
+```sh
+# Install (writes <install_dir>/chum-manifest.toml + logs/ alongside the package).
+cargo run --bin chum -- install <manifest.toml> --root /tmp/chum-demo
+
+# Spawn the installed process. The daemon re-parses chum-manifest.toml
+# from install_dir and hands it to its in-process supervisor.
+cargo run --bin chum -- start <name> --root /tmp/chum-demo
+
+# Daemon-reported status (running | starting | restarting | stopped | failed).
+cargo run --bin chum -- status <name> --root /tmp/chum-demo
+
+# Restart in place; restart_count climbs across user-driven restarts.
+cargo run --bin chum -- restart <name> --root /tmp/chum-demo
+
+# Stop with the default 5-second SIGTERM grace before SIGKILL.
+cargo run --bin chum -- stop <name> --root /tmp/chum-demo
+
+# --grace overrides the SIGTERM window; --json is supported everywhere.
+cargo run --bin chum -- stop <name> --grace 2 --json --root /tmp/chum-demo
+```
+
+When more than one version of `<name>` is installed, lifecycle subcommands require `--version`; otherwise they return `ambiguous_version` listing the installed versions. The same pattern `chum uninstall` uses.
+
+Per-process stdout / stderr land in `<install_dir>/logs/{stdout,stderr}.log`. `chum logs` lands in a later session — today the files are written but the cli doesn't tail them; cat / tail / less work fine.
+
 ## Status
 
 `v0.0.1` — repository scaffold only. v0.1 (CLI + daemon + 10–15 first-party manifests) is targeted for 90 days out. See [`ROADMAP.md`](ROADMAP.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
