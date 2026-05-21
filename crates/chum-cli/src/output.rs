@@ -77,6 +77,66 @@ pub fn emit_installed(artifact: &InstalledArtifact, json: bool) {
     }
 }
 
+/// Confirmation that a package was uninstalled.
+///
+/// JSON envelope:
+/// ```json
+/// {
+///   "status": "ok",
+///   "uninstalled": {
+///     "name": "...",
+///     "version": "...",
+///     "keep_files": false
+///   }
+/// }
+/// ```
+///
+/// Human form: `Uninstalled <name> <version>` plus, when
+/// `keep_files` is true, a trailing note that the files were
+/// retained on disk.
+pub fn emit_uninstalled(target: &RegistryArtifact, keep_files: bool, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "uninstalled": {
+                "name": target.name,
+                "version": target.version,
+                "keep_files": keep_files,
+            }
+        });
+        println!("{envelope}");
+    } else if keep_files {
+        println!(
+            "Uninstalled {} {} (files retained at {})",
+            target.name,
+            target.version,
+            target.install_dir.display(),
+        );
+    } else {
+        println!("Uninstalled {} {}", target.name, target.version);
+    }
+}
+
+/// User answered "no" at the y/N prompt — emit a cancelled envelope
+/// and let `main` exit 0. Cancellation is not an error.
+///
+/// JSON envelope:
+/// ```json
+/// { "status": "cancelled", "name": "...", "version": "..." }
+/// ```
+pub fn emit_uninstall_cancelled(target: &RegistryArtifact, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "cancelled",
+            "name": target.name,
+            "version": target.version,
+        });
+        println!("{envelope}");
+    } else {
+        println!("Uninstall cancelled.");
+    }
+}
+
 /// Render the result of `chum list`.
 ///
 /// JSON envelope:

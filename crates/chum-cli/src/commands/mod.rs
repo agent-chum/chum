@@ -12,6 +12,7 @@ use crate::error::UserFacingError;
 
 pub mod install;
 pub mod list;
+pub mod uninstall;
 
 /// Resolve the CHUM root directory for this invocation.
 ///

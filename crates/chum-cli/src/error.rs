@@ -60,6 +60,28 @@ pub enum UserFacingError {
         /// Package version from the manifest.
         version: String,
     },
+    /// Uninstall asked for a name that has no rows in the registry.
+    NotInstalled {
+        /// Name the caller passed.
+        name: String,
+    },
+    /// Uninstall was asked to remove `<name>` without a version, but
+    /// more than one version is installed and the caller must pick.
+    AmbiguousVersion {
+        /// Name the caller passed.
+        name: String,
+        /// All versions currently installed for that name, in
+        /// registry order.
+        versions: Vec<String>,
+    },
+    /// `fs::remove_dir_all` (or equivalent) failed while tearing down
+    /// a package's `install_dir`.
+    RemoveFailed {
+        /// Path the cli tried to remove.
+        path: PathBuf,
+        /// Underlying I/O error.
+        source: std::io::Error,
+    },
 }
 
 impl UserFacingError {
@@ -113,6 +135,9 @@ impl UserFacingError {
             UserFacingError::RootIo { .. } => "root_io",
             UserFacingError::ChumHomeUnresolved => "chum_home_unresolved",
             UserFacingError::AlreadyInstalled { .. } => "already_installed",
+            UserFacingError::NotInstalled { .. } => "not_installed",
+            UserFacingError::AmbiguousVersion { .. } => "ambiguous_version",
+            UserFacingError::RemoveFailed { .. } => "remove_failed",
         }
     }
 
@@ -207,6 +232,18 @@ impl UserFacingError {
                 format!(
                     "'{name}' {version} is already installed (run 'chum uninstall {name}' first)"
                 )
+            }
+            UserFacingError::NotInstalled { name } => {
+                format!("'{name}' is not installed")
+            }
+            UserFacingError::AmbiguousVersion { name, versions } => {
+                let list = versions.join(", ");
+                format!(
+                    "multiple versions of '{name}' installed ({list}); specify one with 'chum uninstall {name} <version>'"
+                )
+            }
+            UserFacingError::RemoveFailed { path, source } => {
+                format!("could not remove {}: {source}", path.display())
             }
         }
     }
