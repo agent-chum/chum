@@ -83,6 +83,35 @@ chum-daemon spawns the server at artifact.entrypoint
 
 `chum-install` never writes to `state.db`. `chum-registry` never writes to `packages/` or `bin/`. The daemon orchestrates the handoff.
 
+## CLI composition (v0.1 stopgap)
+
+Until the daemon protocol ships, `chum-cli` composes the three lower-level crates directly inside `crates/chum-cli/src/commands/install.rs`. Once `chum-daemon` exists, the cli sends an `Install` request over its protocol surface and the same orchestration moves behind it. The pipeline shape does not change — only the boundary moves.
+
+```
+chum install <manifest>
+   │
+   ▼
+chum-core::parse_and_validate     ── pure parse + validation
+   │
+   ▼
+chum-install::install             ── ACTS: symlink / fetch / extract
+   │   returns InstalledArtifact
+   ▼
+chum-registry::Registry::insert   ── PERSISTS: writes state.db row
+   │
+   ▼
+print confirmation                ── human or `--json` envelope
+```
+
+What the cli adds on top of the three crates:
+
+- **Single ErrorRenderer.** `chum_cli::error::UserFacingError` wraps every crate-level error and maps it to a stable `code` string plus a human message. Library types never reach `stderr` directly.
+- **`--dry-run`.** Parse + validate + root resolution only; no filesystem or registry I/O. The resolved root is echoed back so users can confirm a `--root` override took effect.
+- **`--json` envelopes.** Stable contracts for scripting: `{"status":"ok","installed":{...}}` on success, `{"status":"dry-run","manifest":{...},"root":"...","would_install_at":"..."}` on dry-run, `{"status":"error","code":"...","message":"..."}` on any failure. Error codes are part of the contract — see `crates/chum-cli/src/error.rs::UserFacingError::code`.
+- **Duplicate pre-check.** Before calling `chum-install`, the cli asks the registry whether `(name, version)` already exists. This is defense in depth — `UNIQUE(name, version)` in SQL would also reject — but it lets us return `already_installed` (clearer than `registry_duplicate`) and avoid touching the filesystem at all on a re-install.
+
+`commands/install.rs` carries a `// TODO(chum-v0.x): route through chum-daemon protocol once it lands.` marker at the top. Future contributors should not extend the direct-composition surface — new subcommands wait for the daemon protocol.
+
 ## chum-registry storage (v0.1)
 
 ### Schema
