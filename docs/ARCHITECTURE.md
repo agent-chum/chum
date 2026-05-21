@@ -127,6 +127,31 @@ What the cli adds on top of the three crates:
 
 `commands/install.rs`, `commands/list.rs`, and `commands/uninstall.rs` each carry a `// TODO(chum-v0.x): route through chum-daemon protocol once it lands.` marker at the top. Future contributors should not extend the direct-composition surface — new subcommands wait for the daemon protocol.
 
+### v0.1.0 CLI surface (full command list)
+
+The cli ships fifteen top-level commands. Per-command details live in `chum help <command>`; this list is the canonical roster.
+
+| Command | Purpose |
+|---|---|
+| `install <manifest>` | Run the manifest → registry pipeline. |
+| `uninstall <name>` | Remove `install_dir` and the registry row. |
+| `list` | Read the registry for an installed-package table. |
+| `search [query]` | Substring search across first-party + installed. |
+| `start <name>` | Daemon spawns the MCP server (broker-gated). |
+| `stop <name>` | Daemon terminates the MCP server (SIGTERM grace + SIGKILL). |
+| `restart <name>` | stop + spawn through the daemon. |
+| `status <name>` | Daemon-reported lifecycle status. |
+| `logs <name>` | Tail recent stdout / stderr lines from `<install_dir>/logs/`. |
+| `env list/set/unset <name>` | Manage `runtime.env` in the manifest copy. |
+| `permit <name> --grant K=V` | Issue a permission grant. |
+| `revoke <name> --grant K=V` | Revoke one grant. |
+| `permissions <name>` | Declared / granted / missing diff. |
+| `daemon ping / status` | Health-check the daemon over the IPC socket. |
+| `daemon install-service / uninstall-service / service-status` | Manage the LaunchAgent. |
+| `doctor` | Environment health check (toolchain, npm, CHUM_HOME, chumd, registry). |
+
+Every command supports `--json` for scripting against a stable code-string contract. Color output (lifecycle status, `chum list` source-kind column) auto-enables on a tty and honors `NO_COLOR` + `--no-color`.
+
 ## chumd IPC protocol (v0.1)
 
 The `chumd` background daemon exposes a tiny diagnostic surface over a Unix domain socket at `<chum_home>/daemon.sock` (chmod `0600`). The wire format is **JSON Lines** — one request per connection, terminated by `\n`, then one response, then the daemon closes. Pipelining and streaming verbs are deferred to a later session.

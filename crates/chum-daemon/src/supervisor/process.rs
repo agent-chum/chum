@@ -84,6 +84,18 @@ pub(crate) struct MonitorContext {
 // TODO(chum-v0.x): structured log streaming for `chum logs` lands
 // in Session B.5 — today the daemon only writes files; tail / follow
 // support requires a separate IPC channel that's out of v0.1 scope.
+//
+// TODO(chum-v0.2): log rotation. v0.1 appends forever; long-running
+// servers will accumulate log files until the disk is full. Needs:
+//   - cap file size (e.g. 10 MB per file)
+//   - truncate-to-tail-1MB on overflow OR proper numbered rotation
+//     (chum.stdout.log → chum.stdout.log.1 → chum.stdout.log.2 …)
+//   - integration with `chum logs` so historical rotated files can
+//     still be read
+// Naive truncate-to-tail loses log lines and breaks `chum logs` —
+// numbered rotation is the right shape but needs a flush boundary
+// and probably a separate writer task. Deferred to v0.2 where the
+// streaming-logs work makes the rewriter live anyway.
 pub(crate) fn spawn_child(
     artifact: &InstalledArtifact,
     manifest: &Manifest,
