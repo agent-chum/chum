@@ -83,6 +83,60 @@ chum-daemon spawns the server at artifact.entrypoint
 
 `chum-install` never writes to `state.db`. `chum-registry` never writes to `packages/` or `bin/`. The daemon orchestrates the handoff.
 
+## chum-registry storage (v0.1)
+
+### Schema
+
+The v0.1 schema is a single domain table plus a one-row version marker. `state.db` is created by `Registry::open` on first use; the migration runner advances it to `CURRENT_SCHEMA_VERSION` (currently `1`).
+
+```sql
+CREATE TABLE schema_version (
+    id      INTEGER PRIMARY KEY CHECK (id = 1),
+    version INTEGER NOT NULL
+);
+
+CREATE TABLE installed_artifacts (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL,
+    version      TEXT NOT NULL,
+    install_dir  TEXT NOT NULL,                                   -- canonical path
+    entrypoint   TEXT NOT NULL,                                   -- per SourceKind
+    source_kind  TEXT NOT NULL CHECK (source_kind IN ('npm', 'local', 'binary')),
+    installed_at TEXT NOT NULL,                                   -- ISO 8601 UTC
+    UNIQUE(name, version)
+);
+```
+
+Notes:
+
+- **`installed_at` is registry-owned.** `chum-install`'s `InstalledArtifact` describes *what landed on disk*; *when it was recorded* is a registry fact. `Registry::insert` stamps `Utc::now()`, keeping `chrono` out of every caller and preventing the install/registry boundary from leaking a timestamp concern.
+- **`source_kind` uses a CHECK constraint, not an `ENUM`.** SQLite has no enums; CHECK is the closest equivalent and lets a forward migration extend the allowed set without rewriting the column. A future `SourceKind::Pypi` becomes `ALTER TABLE … CHECK (source_kind IN ('npm', 'local', 'binary', 'pypi'))` in a new migration.
+- **`UNIQUE(name, version)`** is the integrity constraint that surfaces as `RegistryError::DuplicateArtifact` on `insert`.
+
+### Migration philosophy
+
+Migrations are an append-only list. Each entry brings the database from schema version `N` to `N + 1`, runs inside its own transaction, and atomically updates `schema_version` as part of that transaction. The rules:
+
+- **Append, never edit.** Once a migration ships, its SQL is frozen. Bugs are fixed by adding a new migration on top.
+- **One logical change per migration.** A migration adds a column, creates a table, or rewrites data — not a mix.
+- **Version is bumped inside the same transaction.** A partial migration rolls back as a unit; we never end up with the table half-altered and `schema_version` half-updated.
+- **The runner refuses to operate on a future-version database.** If `state.db` reports a schema version higher than `CURRENT_SCHEMA_VERSION`, `Registry::open` returns `MigrationFailed` instead of silently corrupting forward-only state. This is the one case where the binary tells the user to upgrade.
+- **No `DROP TABLE` of domain tables in v0.x.** Renames and column adds only. v1.0 is where backwards-incompatible schema changes become possible, and then only with an explicit migration policy bump.
+
+### Read/write boundary recap
+
+| Operation | Method | Returns |
+|---|---|---|
+| Open or create | `Registry::open(path)` | `Result<Registry, RegistryError>` |
+| Insert one | `registry.insert(&InstalledArtifact)` | `Result<i64, RegistryError>` |
+| Get one | `registry.get_by_name_version(name, version)` | `Result<RegistryArtifact, RegistryError>` |
+| List all | `registry.list_all()` | `Result<Vec<RegistryArtifact>, RegistryError>` |
+| List by name | `registry.list_by_name(name)` | `Result<Vec<RegistryArtifact>, RegistryError>` |
+| Delete one | `registry.delete(name, version)` | `Result<(), RegistryError>` |
+| Read schema version | `registry.schema_version()` | `Result<i64, RegistryError>` |
+
+`Registry` is `!Sync` (it wraps a single `rusqlite::Connection`). The daemon owns one instance and serialises access; tests instantiate one per `TempDir`.
+
 ## Invariants
 
 These are enforced as coding rules in [`CLAUDE.md`](../CLAUDE.md) and reviewed at every PR:
