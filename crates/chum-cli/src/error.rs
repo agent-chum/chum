@@ -156,6 +156,33 @@ pub enum UserFacingError {
         /// Captured stderr (or a synthesized reason string).
         stderr: String,
     },
+    /// `chum start` saw the daemon report `permission_denied` — the
+    /// manifest declared permissions the user has not granted yet.
+    PermissionDenied {
+        /// Package name.
+        name: String,
+        /// Package version.
+        version: String,
+        /// Declared-but-not-granted requirements in `kind=value` form.
+        unmet: Vec<String>,
+    },
+    /// `--grant <input>` did not parse as a known
+    /// `<kind>=<value>` pair.
+    UnknownPermission {
+        /// Literal string the user passed.
+        input: String,
+    },
+    /// `chum revoke` was asked to remove a grant that doesn't exist.
+    GrantNotFound {
+        /// Package name.
+        name: String,
+        /// Package version.
+        version: String,
+        /// Permission kind.
+        kind: String,
+        /// Permission value.
+        value: String,
+    },
 }
 
 impl UserFacingError {
@@ -224,6 +251,9 @@ impl UserFacingError {
             UserFacingError::LogsUnavailable { .. } => "logs_unavailable",
             UserFacingError::ServiceAlreadyInstalled { .. } => "service_already_installed",
             UserFacingError::ServiceCommandFailed { .. } => "service_command_failed",
+            UserFacingError::PermissionDenied { .. } => "permission_denied",
+            UserFacingError::UnknownPermission { .. } => "unknown_permission",
+            UserFacingError::GrantNotFound { .. } => "grant_not_found",
         }
     }
 
@@ -375,6 +405,24 @@ impl UserFacingError {
             }
             UserFacingError::ServiceCommandFailed { cmd, stderr } => {
                 format!("'{cmd}' failed: {stderr}")
+            }
+            UserFacingError::PermissionDenied { name, version, unmet } => {
+                let lines = unmet
+                    .iter()
+                    .map(|u| format!("    chum permit {name} --grant {u}"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                format!(
+                    "'{name}' {version} needs grants not yet given:\n{lines}",
+                )
+            }
+            UserFacingError::UnknownPermission { input } => {
+                format!(
+                    "'{input}' is not a known permission. Expected '<kind>=<value>' where kind is one of: filesystem.read, filesystem.write, network.outbound, env.read, subprocess.exec",
+                )
+            }
+            UserFacingError::GrantNotFound { name, version, kind, value } => {
+                format!("no grant '{kind}={value}' on '{name}' {version}")
             }
         }
     }

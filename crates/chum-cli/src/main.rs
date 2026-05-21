@@ -48,6 +48,12 @@ enum Command {
     Status(commands::status_process::StatusProcessArgs),
     /// Tail recent log lines for an installed MCP server.
     Logs(commands::logs::LogsArgs),
+    /// Grant capability permissions to an installed package.
+    Permit(commands::permit::PermitArgs),
+    /// Revoke a previously-granted permission.
+    Revoke(commands::revoke::RevokeArgs),
+    /// Show declared vs granted vs missing permissions.
+    Permissions(commands::permissions::PermissionsArgs),
     /// Diagnostic + control operations against the chumd daemon itself.
     Daemon {
         #[command(subcommand)]
@@ -90,6 +96,18 @@ async fn main() {
         Command::Logs(args) => {
             let json = args.json;
             (commands::logs::run(args).await, json)
+        }
+        Command::Permit(args) => {
+            let json = args.json;
+            (commands::permit::run(args).await, json)
+        }
+        Command::Revoke(args) => {
+            let json = args.json;
+            (commands::revoke::run(args).await, json)
+        }
+        Command::Permissions(args) => {
+            let json = args.json;
+            (commands::permissions::run(args).await, json)
         }
         Command::Daemon { sub } => {
             let json = match &sub {

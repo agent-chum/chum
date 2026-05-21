@@ -15,7 +15,10 @@ pub mod daemon_service;
 pub mod install;
 pub mod list;
 pub mod logs;
+pub mod permissions;
+pub mod permit;
 pub mod restart;
+pub mod revoke;
 pub mod start;
 pub mod status_process;
 pub mod stop;
@@ -181,6 +184,11 @@ pub(crate) fn map_lifecycle_ipc_error(
                 version: target.version.clone(),
                 install_dir: target.install_dir.clone(),
             },
+            chum_daemon::codes::PERMISSION_DENIED => UserFacingError::PermissionDenied {
+                name: target.name.clone(),
+                version: target.version.clone(),
+                unmet: parse_unmet_grants_from_message(&message),
+            },
             other => UserFacingError::DaemonProtocol {
                 reason: format!("server error {other}: {message}"),
             },
@@ -191,4 +199,24 @@ pub(crate) fn map_lifecycle_ipc_error(
             }
         }
     }
+}
+
+/// Extract the comma-separated `kind=value` list out of a daemon
+/// `permission_denied` message. The daemon's exact format is:
+/// `'<name>' <version> requires grants not yet given: k1=v1, k2=v2. Run: chum permit ...`
+///
+/// We isolate the segment between "given: " and ". Run:" then split
+/// on ", ". Best-effort — if the daemon's message changes shape in a
+/// later session, the cli still surfaces a useful error (the raw
+/// message), just without the structured `unmet` field.
+fn parse_unmet_grants_from_message(msg: &str) -> Vec<String> {
+    let Some(after) = msg.split_once("given: ") else {
+        return Vec::new();
+    };
+    let payload = after.1.split_once(". Run:").map(|p| p.0).unwrap_or(after.1);
+    payload
+        .split(", ")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.trim().to_string())
+        .collect()
 }

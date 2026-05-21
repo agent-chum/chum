@@ -14,6 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+chum-broker = { path = "../chum-broker" }
 chum-core.workspace = true
 chum-daemon.workspace = true
 chum-install.workspace = true

@@ -95,5 +95,6 @@ pub async fn run(args: InstallArgs) -> Result<(), UserFacingError> {
 
     registry.insert(&artifact).map_err(UserFacingError::Registry)?;
     output::emit_installed(&artifact, args.json);
+    output::emit_install_permission_hint(&manifest, args.json);
     Ok(())
 }

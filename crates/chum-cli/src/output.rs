@@ -39,6 +39,32 @@ fn relative_to_root<'a>(install_dir: &'a Path, root: &Path) -> std::path::PathBu
         .unwrap_or_else(|_| install_dir.to_path_buf())
 }
 
+/// Hint emitted after a successful `chum install` when the manifest
+/// declares permissions. Tells the user exactly which
+/// `chum permit --grant <kind>=<value>` calls they'll need to run
+/// before `chum start` works.
+///
+/// JSON mode skips this — the structured envelope already includes
+/// enough info via the manifest data the caller could read.
+pub fn emit_install_permission_hint(manifest: &Manifest, json: bool) {
+    if json {
+        return;
+    }
+    if manifest.permissions.is_empty() {
+        return;
+    }
+    println!();
+    println!(
+        "This manifest declares permissions you'll need to grant before 'chum start':"
+    );
+    for req in manifest.permissions.iter_requirements() {
+        println!(
+            "    chum permit {} --grant {}={}",
+            manifest.package.name, req.kind, req.value,
+        );
+    }
+}
+
 /// Print confirmation that a manifest was installed and persisted.
 ///
 /// JSON envelope:
@@ -205,6 +231,124 @@ pub fn emit_restarted(
             "Restarted {} {} (pid {}, restart_count {})",
             name, version, resp.pid, resp.restart_count,
         );
+    }
+}
+
+/// `chum permit` confirmation listing every grant that landed.
+pub fn emit_granted(
+    name: &str,
+    version: &str,
+    granted: &[(String, String)],
+    json: bool,
+) {
+    if json {
+        let entries: Vec<serde_json::Value> = granted
+            .iter()
+            .map(|(k, v)| serde_json::json!({"kind": k, "value": v}))
+            .collect();
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "granted": {
+                "name": name,
+                "version": version,
+                "grants": entries,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!("Granted to {name} {version}:");
+        for (k, v) in granted {
+            println!("  {k}={v}");
+        }
+    }
+}
+
+/// `chum revoke` confirmation.
+pub fn emit_revoked(name: &str, version: &str, kind: &str, value: &str, json: bool) {
+    if json {
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "revoked": {
+                "name": name,
+                "version": version,
+                "kind": kind,
+                "value": value,
+            }
+        });
+        println!("{envelope}");
+    } else {
+        println!("Revoked from {name} {version}: {kind}={value}");
+    }
+}
+
+/// `chum permissions` three-section diff.
+pub fn emit_permissions(
+    name: &str,
+    version: &str,
+    declared: &[(String, String)],
+    granted: &[chum_registry::Grant],
+    missing: &[(String, String)],
+    json: bool,
+) {
+    if json {
+        let declared_json: Vec<serde_json::Value> = declared
+            .iter()
+            .map(|(k, v)| serde_json::json!({"kind": k, "value": v}))
+            .collect();
+        let granted_json: Vec<serde_json::Value> = granted
+            .iter()
+            .map(|g| {
+                serde_json::json!({
+                    "kind": g.kind,
+                    "value": g.value,
+                    "granted_at": g.granted_at.to_rfc3339(),
+                })
+            })
+            .collect();
+        let missing_json: Vec<serde_json::Value> = missing
+            .iter()
+            .map(|(k, v)| serde_json::json!({"kind": k, "value": v}))
+            .collect();
+        let envelope = serde_json::json!({
+            "status": "ok",
+            "permissions": {
+                "name": name,
+                "version": version,
+                "declared": declared_json,
+                "granted": granted_json,
+                "missing": missing_json,
+            }
+        });
+        println!("{envelope}");
+        return;
+    }
+    println!("{name} {version}");
+    println!();
+    println!("Declared by manifest:");
+    if declared.is_empty() {
+        println!("  (none)");
+    } else {
+        for (k, v) in declared {
+            println!("  {k}  {v}");
+        }
+    }
+    println!();
+    println!("Granted:");
+    if granted.is_empty() {
+        println!("  (none)");
+    } else {
+        for g in granted {
+            println!("  {}  {}", g.kind, g.value);
+        }
+    }
+    println!();
+    println!("Missing (would block 'chum start'):");
+    if missing.is_empty() {
+        println!("  (none)");
+    } else {
+        for (k, v) in missing {
+            println!("  {k}  {v}");
+        }
     }
 }
 

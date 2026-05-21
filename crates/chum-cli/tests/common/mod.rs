@@ -84,3 +84,31 @@ pub fn run_chum(args: &[&str]) -> Output {
 pub fn path_str(p: &Path) -> String {
     p.display().to_string()
 }
+
+/// Bare tempdir wrapper used by tests that don't need the manifest
+/// template (broker tests, for example). Pairs with
+/// `run_chum_with_root`.
+pub struct TestDb {
+    pub _dir: TempDir,
+}
+
+impl TestDb {
+    pub fn new() -> Self {
+        let dir = TempDir::new().expect("tempdir");
+        Self { _dir: dir }
+    }
+}
+
+/// Spawn `chum` with `--root <root>` injected after the first
+/// positional/subcommand arg. Returns the completed Output.
+pub fn run_chum_with_root(root: &Path, args: &[&str]) -> Output {
+    let mut all = Vec::with_capacity(args.len() + 2);
+    all.extend(args.iter().copied());
+    all.push("--root");
+    let root_str = root.display().to_string();
+    all.push(&root_str);
+    Command::new(chum_bin())
+        .args(&all)
+        .output()
+        .expect("spawn chum")
+}
