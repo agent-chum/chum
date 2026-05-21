@@ -30,6 +30,7 @@ repository = "https://github.com/agent-chum/chum"
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 chum-core = { path = "crates/chum-core" }
+chum-daemon = { path = "crates/chum-daemon" }
 chum-install = { path = "crates/chum-install" }
 chum-registry = { path = "crates/chum-registry" }
 clap = { version = "4", features = ["derive"] }

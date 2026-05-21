@@ -1,4 +1,7 @@
-//! Errors raised by the in-memory process supervisor.
+//! Errors raised by the in-memory process supervisor and the IPC
+//! layer.
+
+use std::path::PathBuf;
 
 use thiserror::Error;
 
@@ -56,6 +59,72 @@ pub enum SupervisorError {
         /// terminal status.
         key: ProcessKey,
     },
+
+    /// Underlying I/O error from `std` / `tokio`.
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+/// Errors emitted by the IPC server and client.
+///
+/// Wire-format errors (unsupported protocol version, unknown verb,
+/// request too large) are also exposed as stable string codes via the
+/// [`crate::ipc::codes`] module so that scripts can pattern-match
+/// against them without parsing free-form messages.
+#[derive(Debug, Error)]
+pub enum IpcError {
+    /// `bind()` on the Unix socket failed.
+    #[error("bind on {path}: {source}")]
+    BindFailed {
+        /// Socket path the daemon tried to bind to.
+        path: PathBuf,
+        /// Underlying I/O error from the OS.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// A live `chumd` already owns the target socket — startup must
+    /// abort.
+    #[error("another chumd appears to be running at {path}")]
+    SocketAlreadyInUse {
+        /// Existing socket path that responded to a connect probe.
+        path: PathBuf,
+    },
+
+    /// `connect()` on the client side failed (no daemon running,
+    /// socket file missing, permission denied).
+    #[error("cannot reach daemon at {path}: {source}")]
+    ConnectFailed {
+        /// Socket path the client tried to reach.
+        path: PathBuf,
+        /// Underlying I/O error from the OS.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// A wire-protocol violation: malformed JSON, an unexpected shape,
+    /// or a response that does not decode into the expected typed
+    /// envelope.
+    #[error("protocol error: {reason}")]
+    ProtocolError {
+        /// Free-form reason. Stable across patch versions; do not
+        /// pattern-match on the string — pattern-match on the variant.
+        reason: String,
+    },
+
+    /// The server returned an error envelope. Carries the stable
+    /// `code` (see [`crate::ipc::codes`]) and the human message.
+    #[error("daemon returned error: {code}: {message}")]
+    ServerError {
+        /// Stable machine code.
+        code: String,
+        /// Human-readable message from the server.
+        message: String,
+    },
+
+    /// `serde_json` (de)serialisation failure.
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
 
     /// Underlying I/O error from `std` / `tokio`.
     #[error("io error: {0}")]
