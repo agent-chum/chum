@@ -26,6 +26,10 @@ pub struct ListArgs {
     /// Emit machine-readable JSON on stdout instead of a human table.
     #[arg(long)]
     pub json: bool,
+
+    /// Disable ANSI color escapes even when stdout is a tty.
+    #[arg(long)]
+    pub no_color: bool,
 }
 
 /// Execute `chum list`.
@@ -57,6 +61,6 @@ pub async fn run(args: ListArgs) -> Result<(), UserFacingError> {
     }
     rows.sort_by(|a, b| a.installed_at.cmp(&b.installed_at));
 
-    output::emit_list(&rows, &root, args.json);
+    output::emit_list(&rows, &root, args.json, args.no_color);
     Ok(())
 }

@@ -13,6 +13,7 @@ use clap::{Parser, Subcommand};
 mod commands;
 mod error;
 mod output;
+mod term;
 
 /// Top-level `chum` CLI invocation.
 #[derive(Parser, Debug)]

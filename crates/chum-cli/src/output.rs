@@ -591,7 +591,7 @@ pub fn emit_logs(resp: &TailLogsResponse, json: bool) {
 
 /// `chum status` output for a single process. JSON envelope:
 /// `{"status":"ok","process":{...}}`.
-pub fn emit_process_status(resp: &ProcessStatusResponse, json: bool) {
+pub fn emit_process_status(resp: &ProcessStatusResponse, json: bool, no_color: bool) {
     if json {
         let mut process = serde_json::json!({
             "name": resp.name,
@@ -611,8 +611,12 @@ pub fn emit_process_status(resp: &ProcessStatusResponse, json: bool) {
         });
         println!("{envelope}");
     } else {
+        let color = crate::term::color_enabled(no_color);
         println!("{} {}", resp.name, resp.version);
-        println!("  status:        {}", resp.status);
+        println!(
+            "  status:        {}",
+            crate::term::colorize_status(&resp.status, color)
+        );
         if let Some(p) = resp.pid {
             println!("  pid:           {p}");
         }
@@ -714,9 +718,10 @@ pub fn emit_daemon_status(status: &StatusResponse, json: bool) {
 ///
 /// Human form: a fixed-width table with columns
 /// `NAME | VERSION | KIND | INSTALLED | PATH`, where `PATH` is
-/// rendered relative to `root` for compactness. An empty list prints
-/// `No packages installed.` and exits 0.
-pub fn emit_list(rows: &[RegistryArtifact], root: &Path, json: bool) {
+/// rendered relative to `root` for compactness. The `KIND` column
+/// is ANSI-colored when stdout is a tty unless `no_color = true` or
+/// `$NO_COLOR` is set.
+pub fn emit_list(rows: &[RegistryArtifact], root: &Path, json: bool, no_color: bool) {
     if json {
         let packages: Vec<serde_json::Value> = rows
             .iter()
@@ -788,17 +793,22 @@ pub fn emit_list(rows: &[RegistryArtifact], root: &Path, json: bool) {
         kw = kind_w,
         iw = installed_w,
     );
+    let color = crate::term::color_enabled(no_color);
     for (i, r) in rows.iter().enumerate() {
+        let kind_str = source_kind_str(r.source_kind);
+        let kind_colored = crate::term::colorize_kind(kind_str, color);
+        // Padding has to compensate for the ANSI escape characters
+        // that don't render — print kind separately with a manual
+        // pad rather than using format!'s width spec.
+        let pad = " ".repeat(kind_w.saturating_sub(kind_str.len()));
         println!(
-            "{:nw$}  {:vw$}  {:kw$}  {:iw$}  {}",
+            "{:nw$}  {:vw$}  {kind_colored}{pad}  {:iw$}  {}",
             r.name,
             r.version,
-            source_kind_str(r.source_kind),
             installed_fmt[i],
             paths[i],
             nw = name_w,
             vw = ver_w,
-            kw = kind_w,
             iw = installed_w,
         );
     }

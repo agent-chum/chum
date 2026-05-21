@@ -27,6 +27,10 @@ pub struct StatusProcessArgs {
     /// Emit machine-readable JSON on stdout.
     #[arg(long)]
     pub json: bool,
+
+    /// Disable ANSI color escapes even when stdout is a tty.
+    #[arg(long)]
+    pub no_color: bool,
 }
 
 /// Execute `chum status`.
@@ -44,6 +48,6 @@ pub async fn run(args: StatusProcessArgs) -> Result<(), UserFacingError> {
         .await
         .map_err(|e| map_lifecycle_ipc_error(e, &target))?;
 
-    output::emit_process_status(&resp, args.json);
+    output::emit_process_status(&resp, args.json, args.no_color);
     Ok(())
 }
