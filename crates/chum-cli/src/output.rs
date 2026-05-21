@@ -234,6 +234,46 @@ pub fn emit_restarted(
     }
 }
 
+/// `chum search` output. Compact table for humans, structured
+/// envelope for JSON.
+pub fn emit_search(results: &[crate::commands::search::SearchResult], json: bool) {
+    if json {
+        let entries: Vec<serde_json::Value> = results
+            .iter()
+            .map(|r| {
+                serde_json::json!({
+                    "name": r.name,
+                    "version": r.version,
+                    "status": r.status,
+                    "description": r.description,
+                })
+            })
+            .collect();
+        let envelope = serde_json::json!({"status": "ok", "results": entries});
+        println!("{envelope}");
+        return;
+    }
+    if results.is_empty() {
+        println!("No packages found.");
+        return;
+    }
+    let name_w = results.iter().map(|r| r.name.len()).max().unwrap_or(0).max("NAME".len());
+    let ver_w = results.iter().map(|r| r.version.len()).max().unwrap_or(0).max("VERSION".len());
+    let status_w = "available".len();
+    println!(
+        "{:nw$}  {:vw$}  {:sw$}  DESCRIPTION",
+        "NAME", "VERSION", "STATUS",
+        nw = name_w, vw = ver_w, sw = status_w,
+    );
+    for r in results {
+        println!(
+            "{:nw$}  {:vw$}  {:sw$}  {}",
+            r.name, r.version, r.status, r.description,
+            nw = name_w, vw = ver_w, sw = status_w,
+        );
+    }
+}
+
 /// `chum env list` output. Keys only — values are never shown,
 /// even in JSON mode (the manifest's `runtime.env` may carry
 /// secrets).

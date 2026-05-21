@@ -59,6 +59,8 @@ enum Command {
         #[command(subcommand)]
         sub: commands::env::EnvSub,
     },
+    /// Search first-party + installed packages by name or description.
+    Search(commands::search::SearchArgs),
     /// Diagnostic + control operations against the chumd daemon itself.
     Daemon {
         #[command(subcommand)]
@@ -121,6 +123,10 @@ async fn main() {
                 commands::env::EnvSub::Unset { common, .. } => common.json,
             };
             (commands::env::run(sub).await, json)
+        }
+        Command::Search(args) => {
+            let json = args.json;
+            (commands::search::run(args).await, json)
         }
         Command::Daemon { sub } => {
             let json = match &sub {

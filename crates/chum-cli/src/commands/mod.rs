@@ -20,6 +20,7 @@ pub mod permissions;
 pub mod permit;
 pub mod restart;
 pub mod revoke;
+pub mod search;
 pub mod start;
 pub mod status_process;
 pub mod stop;
