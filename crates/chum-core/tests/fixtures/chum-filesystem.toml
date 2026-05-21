@@ -33,8 +33,13 @@ tools = ["read_file", "write_file", "list_directory", "create_directory", "move_
 resources = []
 prompts = []
 
-# Forward-compat: v0.2 enforces these grants, v0.1 chum-core accepts the
-# content as an opaque toml::Table and round-trips it without interpreting.
+# v0.1 typed permissions. The broker checks these at spawn time
+# against the user's `chum permit` grants and refuses spawn if any
+# declared permission is ungranted. Real enforcement (sandbox-exec,
+# env scrubbing) lands in v0.2.
 [permissions]
-allowed_paths = ["${HOME}/Documents", "${HOME}/Desktop"]
-denied_paths = ["${HOME}/.ssh", "${HOME}/.aws"]
+[permissions.filesystem]
+read  = ["${HOME}/Documents", "${HOME}/Desktop"]
+write = ["${HOME}/Documents"]
+[permissions.env]
+read = ["HOME"]

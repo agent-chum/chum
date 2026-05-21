@@ -17,4 +17,8 @@ pub mod error;
 pub mod manifest;
 
 pub use error::ManifestError;
-pub use manifest::{Manifest, parse_and_validate, parse_str, validate};
+pub use manifest::{
+    EnvPermissions, FilesystemPermissions, Manifest, NetworkPermissions, PermissionKind,
+    PermissionRequirement, Permissions, SubprocessPermissions, parse_and_validate, parse_str,
+    validate,
+};

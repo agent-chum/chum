@@ -9,9 +9,14 @@
 //! and older parsers reject newer manifests cleanly.
 
 mod parse;
+pub mod permissions;
 mod validate;
 
 pub use parse::{parse_and_validate, parse_str};
+pub use permissions::{
+    EnvPermissions, FilesystemPermissions, NetworkPermissions, PermissionKind,
+    PermissionRequirement, Permissions, SubprocessPermissions,
+};
 pub use validate::validate;
 
 use serde::{Deserialize, Serialize};
@@ -50,10 +55,11 @@ pub struct Manifest {
     /// Declared capabilities. Informational in v0.1; enforced in v0.2.
     #[serde(default)]
     pub capabilities: Capabilities,
-    /// Forward-compat placeholder for v0.2 permission grants. Accepts any
-    /// TOML content; v0.1 chum-core does not interpret it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub permissions: Option<toml::Table>,
+    /// Declared permissions (bookkeeping in v0.1, enforcement in v0.2).
+    /// Empty by default — manifests without a `[permissions]` block
+    /// require nothing and the broker auto-allows their spawn.
+    #[serde(default)]
+    pub permissions: Permissions,
     /// Forward-compat placeholder for v0.3 signature fields. Accepts any
     /// TOML content; v0.1 chum-core does not interpret it.
     #[serde(default, skip_serializing_if = "Option::is_none")]

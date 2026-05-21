@@ -74,7 +74,7 @@ fn artifact_and_manifest(
         },
         health: Health::Process,
         capabilities: Capabilities::default(),
-        permissions: None,
+        permissions: chum_core::Permissions::default(),
         signature: None,
     };
 

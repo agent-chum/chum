@@ -138,20 +138,17 @@ fn parse_and_validate_filesystem_ok() {
 }
 
 #[test]
-fn permissions_placeholder_round_trips_arbitrary_content() {
-    // The filesystem fixture carries a `[permissions]` block with v0.2-shaped
-    // content (allowed_paths / denied_paths). v0.1 chum-core does not
-    // interpret it — but it must accept, expose, and round-trip the content
-    // verbatim. Future v0.2 chum-core that introduces typed permissions will
-    // bump schema_version, so this freeform-table behaviour does not stay
-    // freeform forever.
+fn permissions_parse_typed_round_trip() {
+    // The filesystem fixture carries a typed `[permissions]` block.
+    // v0.1 chum-core decodes it into the `Permissions` struct;
+    // round-tripping through toml::to_string must preserve the
+    // declared shape.
     let manifest = parse_str(FILESYSTEM).expect("parse");
-    let perms = manifest
-        .permissions
-        .as_ref()
-        .expect("filesystem fixture should carry a [permissions] block");
-    assert!(perms.contains_key("allowed_paths"));
-    assert!(perms.contains_key("denied_paths"));
+    let perms = &manifest.permissions;
+    assert!(!perms.is_empty());
+    assert!(perms.filesystem.read.iter().any(|p| p.contains("Documents")));
+    assert!(perms.filesystem.write.iter().any(|p| p.contains("Documents")));
+    assert!(perms.env.read.iter().any(|v| v == "HOME"));
 
     let serialised = toml::to_string(&manifest).expect("serialise");
     let reparsed = parse_str(&serialised).expect("re-parse");
